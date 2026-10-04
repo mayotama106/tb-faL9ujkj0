@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Ticket Builder</title>
+<style>
+  :root {
+    --navy: #0B1B3A;
+    --blue: #1E3A8A;
+    --mist: #A1B2D6;
+    --sand: #E7E2D9;
+    --gold: #B48A5A;
+    --page: #F4F2EC;   /* sand を明るくした地色 */
+    --field: #FBFAF7;  /* 入力欄の地色 */
+    --lv: #1E3A8A;     /* 階層の色。階層ごとに画面側で上書きする */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--navy);
+    font-family: "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  header {
+    background: var(--navy);
+    color: #fff;
+    text-align: center;
+    padding: 18px 16px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    font-size: 17px;
+  }
+  main { max-width: 1280px; margin: 0 auto; padding: 24px 20px 64px; }
+
+  /* ジャンル選択 */
+  .genres { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .genre {
+    font: inherit; font-weight: 600; color: var(--navy);
+    background: var(--sand); border: 0; border-radius: 999px;
+    padding: 8px 18px; cursor: pointer;
+  }
+  .genre[aria-pressed="true"] { background: var(--blue); color: #fff; }
+  .genre:disabled { color: #7d8597; cursor: not-allowed; }
+  .genre small { font-weight: 400; margin-left: 6px; }
+
+  .layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 980px) {
+    .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+    .preview { position: sticky; top: 16px; max-height: calc(100vh - 32px); }
+  }
+
+  .card { background: var(--sand); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+  .card.closed h2 { margin-bottom: 0; }
+  .card h2 span { font-weight: 400; color: var(--blue); margin-left: 6px; }
+
+  /* 入力 */
+  .node { margin-top: 12px; }
+  .node:first-child { margin-top: 0; }
+  .node > label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .head { display: flex; align-items: center; gap: 4px; font-weight: 600; margin-bottom: 4px; }
+  .group > .head { color: var(--blue); }
+  .tog {
+    font: inherit; font-size: 13px; line-height: 1; color: var(--blue); background: transparent;
+    border: 0; border-radius: 4px; width: 22px; height: 22px; padding: 0; margin-left: -4px; cursor: pointer; flex: 0 0 auto;
+  }
+  .kids { margin: 10px 0 0 6px; padding-left: 14px; border-left: 3px solid var(--lv); }
+  textarea, input[type="text"] {
+    width: 100%; font: inherit; color: var(--navy);
+    background: var(--field); border: 1px solid var(--mist); border-radius: 8px;
+    padding: 8px 10px; resize: none; overflow: hidden; display: block;
+  }
+  textarea::placeholder, input::placeholder { color: #8b93a7; }
+  textarea:focus, input:focus, button:focus-visible {
+    outline: 2px solid var(--blue); outline-offset: 1px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font: inherit; color: var(--navy); background: var(--field);
+    border: 1px solid var(--mist); border-radius: 999px; padding: 5px 16px; cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+  /* プレビュー */
+  .preview { background: var(--sand); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .bar h2 { margin: 0; font-size: 16px; flex: 1 1 auto; }
+  .count { font-weight: 600; color: var(--blue); }
+  .count.done { color: var(--navy); }
+  pre {
+    margin: 0; background: var(--field); border: 1px solid var(--mist); border-radius: 8px;
+    padding: 14px; white-space: pre-wrap; word-break: break-word; overflow: auto; flex: 1 1 auto;
+    font-family: ui-monospace, "SFMono-Regular", Consolas, "Hiragino Sans", "Yu Gothic UI", monospace;
+    font-size: 13.5px; line-height: 1.7; min-height: 240px;
+  }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: center; }
+  .primary {
+    font: inherit; font-weight: 700; color: #fff; background: var(--gold);
+    border: 0; border-radius: 999px; padding: 10px 26px; cursor: pointer;
+  }
+  .plain {
+    font: inherit; color: var(--navy); background: transparent;
+    border: 1px solid var(--mist); border-radius: 999px; padding: 9px 18px; cursor: pointer;
+  }
+  .etc-btn {
+    font: inherit; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--lv);
+    background: var(--field); border: 1.5px solid var(--lv); border-radius: 999px;
+    padding: 4px 14px; margin-top: 10px; cursor: pointer;
+  }
+  .etc-btn:hover { background: var(--lv); color: #fff; }
+  .card > .etc-btn { display: block; }
+  .row { display: flex; gap: 6px; margin-bottom: 6px; }
+  .row input { flex: 1 1 auto; min-width: 0; }
+  .del {
+    font: inherit; color: var(--navy); background: var(--field); border: 1px solid var(--mist);
+    border-radius: 8px; width: 38px; min-height: 30px; flex: 0 0 auto; cursor: pointer;
+  }
+  .rows > .etc-btn { margin-top: 2px; }
+  .step { margin-top: 10px; }
+  .step-head { display: flex; align-items: center; gap: 6px; }
+  .step > input { margin-top: 6px; }
+  .badge {
+    font-size: 12px; font-weight: 700; color: #fff; background: var(--navy);
+    border-radius: 999px; padding: 3px 10px; white-space: nowrap; flex: 0 0 auto;
+  }
+  .badge.if { background: var(--blue); }
+  .badge.err { background: #8A6234; }
+  .step > .chips { margin-top: 6px; }
+  .branch { font-weight: 600; font-size: 14px; margin-top: 10px; }
+  .branch:first-child { margin-top: 0; }
+  .links { display: flex; flex-wrap: wrap; gap: 0 8px; }
+  .note-field { margin-top: 8px; }
+  .note-field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .spacer { flex: 1 1 auto; }
+  .note { margin: 12px 0 0; font-size: 13px; color: #4a5672; }
+</style>
+</head>
+<body>
+<header>TICKET BUILDER</header>
+<main>
+  <div class="genres" id="genres" role="group" aria-label="チケットのジャンル"></div>
+  <div class="layout">
+    <div id="form"></div>
+    <section class="preview" aria-label="チケット本文">
+      <div class="bar">
+        <h2>チケット本文</h2>
+        <span class="count" id="count"></span>
+        <div class="chips" role="group" aria-label="出力形式">
+          <button type="button" class="chip" data-fmt="wiki">Jira記法</button>
+          <button type="button" class="chip" data-fmt="md">Markdown</button>
+        </div>
+      </div>
+      <pre id="out"></pre>
+      <div class="actions">
+        <button type="button" class="primary" id="copyBody">本文をコピー</button>
+        <button type="button" class="plain" id="copyTitle">タイトルをコピー</button>
+        <span class="spacer"></span>
+        <button type="button" class="plain" id="reset">このジャンルの入力を消去</button>
+      </div>
+      <p class="note">入力内容はこのブラウザ内にだけ保存され、外部には送信されない。</p>
+    </section>
+  </div>
+</main>
+
+<script>
+/* ===== 定義とチケット生成(画面に依存しない部分) ===== */
+const MISSING = "【未記入】";
+const NEW = "新規作成", MOD = "既存改修";
+const ERR_KINDS = ["エラーモーダル", "エラー画面", "その他"];
+const q = (id, text, label, extra) => Object.assign({ id, q: text, label, type: "text" }, extra || {});
+const err = (id, text, label) => ({ id, q: text, label, type: "error" });
+const group = (id, text, label, children, refChildren) => ({ id, q: text, label, type: "group", children, refChildren });
+const list = (id, text, label, ph, children) => ({ id, q: text, label, type: "list", ph, children });
+const REF = "原典を参照して省略する";
+const SRC_LABEL = "原典(IF・API仕様書)";
+const LOGIC_SRC = "原典(設計書・仕様書)";
+const SCREEN_SRC = "原典(画面設計書・デザイン)";
+const HAS = "ある", HAS_NOT = "ない";
+const EL_KINDS = ["表示", "入力", "ボタン"];
+
+/* 原典を参照する場合にも残す問い */
+const REQ_FMT = err("req_fmt", "形式エラーの場合は？", "形式エラーの場合");
+const REQ_MISS = err("req_miss", "必須の項目の値がない場合は？", "必須項目の値がない場合");
+const RES_FMT = err("res_fmt", "形式エラーの場合は？", "形式エラーの場合");
+const RES_MISS = err("res_miss", "必須の項目の値がない場合は？", "必須項目の値がない場合");
+const IN_FMT = err("in_fmt", "形式エラーの場合は？", "形式エラーの場合");
+const IN_MISS = err("in_miss", "必須の項目の値がない場合は？", "必須項目の値がない場合");
+const OUT_FMT = err("out_fmt", "形式エラーの場合は？", "形式エラーの場合");
+const OUT_MISS = err("out_miss", "必須の項目の値がない場合は？", "必須項目の値がない場合");
+
+/* ジャンルごとの観点表。ジャンルを増やすときは、ここに定義を足す。 */
+const GENRES = {
+  api: {
+    name: "API作成",
+    noun: "API",
+    example: "例: 振込先登録",
+    srcLabel: SRC_LABEL,
+    func: [
+      q("trigger", "なにを起因に誰からいつ呼び出される？", "呼び出しの起因・呼び出し元・タイミング"),
+      q("endpoint", "エンドポイントは？", "エンドポイント"),
+      { id: "method", q: "APIのメソッドはPUT/GET/POST/DELETEのうちどれ？", label: "メソッド", type: "choice",
+        options: ["GET", "POST", "PUT", "DELETE"],
+        branches: {
+          GET: [
+            q("get_db", "どのDBにアクセスする？", "アクセス先DB"),
+            q("get_cond", "検索対象の条件は？", "検索対象の条件", { children: [
+              err("get_zero", "ヒット0件の場合はどうする？", "ヒット0件の場合") ] })
+          ],
+          POST: [
+            q("post_db", "どのDBに保存する？", "保存先DB", { children: [
+              err("post_dup", "同じリクエストが届いた際は？", "同じリクエストが届いた場合"),
+              err("post_fail", "保存に失敗したときは？", "保存に失敗した場合") ] })
+          ],
+          PUT: [
+            q("put_db", "どのDBにアクセスする？", "アクセス先DB"),
+            q("put_cond", "更新対象の条件は？", "更新対象の条件", { children: [
+              err("put_none", "対象が見つからない場合は？", "対象が見つからない場合"),
+              err("put_part", "一部の対象で失敗した場合は？", "一部の対象で失敗した場合") ] })
+          ],
+          DELETE: [
+            q("del_db", "どのDBにアクセスする？", "アクセス先DB"),
+            q("del_cond", "削除対象の条件は？", "削除対象の条件", { children: [
+              err("del_none", "対象が見つからない場合は？", "対象が見つからない場合"),
+              err("del_cant", "削除できない場合は？", "削除できない場合") ] }),
+            { id: "del_kind", q: "削除は論理削除か物理削除か", label: "削除方式", type: "choice",
+              options: ["論理削除", "物理削除"] },
+            q("del_rel", "紐づくデータはどうする？", "紐づくデータの扱い")
+          ]
+        } },
+      group("req", "リクエストパラメータは何？", "リクエストパラメータ", [
+        { id: "req_place", q: "パラメータ形式は？", label: "パラメータ形式", type: "multi",
+          options: ["クエリ", "パス", "ボディ", "ヘッダ"] },
+        list("req_items", "項目とそれぞれの型は？", "項目と型", "項目名: 型", [REQ_FMT]),
+        list("req_need", "それぞれの項目は必須か任意か", "必須/任意", "項目名: 必須または任意", [REQ_MISS])
+      ], [REQ_FMT, REQ_MISS]),
+      { id: "logic", q: "API内で実装するロジックはある？", label: "ロジック", type: "logic" },
+      group("res", "レスポンスの形式は？", "レスポンス", [
+        group("res_ok", "正常な場合は？", "正常な場合", [
+          list("res_items", "項目とそれぞれの型は？", "項目と型", "項目名: 型", [RES_FMT]),
+          list("res_need", "それぞれの項目は必須か任意か", "必須/任意", "項目名: 必須または任意", [RES_MISS])
+        ], [RES_FMT, RES_MISS]),
+        err("res_ng", "異常の場合は？", "異常の場合")
+      ])
+    ],
+    nonfunc: [
+      q("nf_freq", "呼び出し頻度は？", "呼び出し頻度"),
+      q("nf_timeout", "タイムアウトの時間は？", "タイムアウト時間"),
+      q("nf_volume", "データ量の上限は？", "データ量の上限")
+    ],
+    /* 既存改修のときだけ問う項目。always は、既存改修でも未記入を表示する指定。 */
+    modOnly: [
+      q("mod_impact", "既存影響は？", "既存影響", { always: true }),
+      q("mod_if", "IFの書き直しは必要？", "IFの書き直し要否", { always: true })
+    ]
+  },
+  /* API作成から、API特有の項目(エンドポイント、メソッド、パラメータ形式)を除いた構成 */
+  logic: {
+    name: "ロジック作成",
+    noun: "ロジック",
+    example: "例: 手数料計算",
+    srcLabel: LOGIC_SRC,
+    func: [
+      q("trigger", "なにを起因に誰からいつ呼び出される？", "呼び出しの起因・呼び出し元・タイミング"),
+      group("in", "入力は何？", "入力", [
+        list("in_items", "項目とそれぞれの型は？", "項目と型", "項目名: 型", [IN_FMT]),
+        list("in_need", "それぞれの項目は必須か任意か", "必須/任意", "項目名: 必須または任意", [IN_MISS])
+      ], [IN_FMT, IN_MISS]),
+      { id: "logic", q: "実装するロジックは？", label: "ロジック", type: "logic", noHas: true },
+      group("out", "出力は何？", "出力", [
+        group("out_ok", "正常な場合は？", "正常な場合", [
+          list("out_items", "項目とそれぞれの型は？", "項目と型", "項目名: 型", [OUT_FMT]),
+          list("out_need", "それぞれの項目は必須か任意か", "必須/任意", "項目名: 必須または任意", [OUT_MISS])
+        ], [OUT_FMT, OUT_MISS]),
+        err("out_ng", "異常の場合は？", "異常の場合")
+      ])
+    ],
+    nonfunc: [
+      q("nf_freq", "呼び出し頻度は？", "呼び出し頻度"),
+      q("nf_timeout", "タイムアウトの時間は？", "タイムアウト時間"),
+      q("nf_volume", "データ量の上限は？(任意)", "データ量の上限", { optional: true })
+    ],
+    modOnly: [
+      q("mod_impact", "既存影響は？", "既存影響", { always: true }),
+      q("mod_doc", "設計書の書き直しは必要？", "設計書の書き直し要否", { always: true })
+    ]
+  },
+  screen: {
+    name: "画面作成",
+    noun: "画面",
+    example: "例: 振込先登録",
+    srcLabel: SCREEN_SRC,
+    func: [
+      q("screen_id", "画面IDは？", "画面ID"),
+      q("from", "どこから遷移してくる？", "遷移元", { children: [
+        q("from_data", "遷移元から引き継ぐデータは？", "遷移元から引き継ぐデータ") ] }),
+      { id: "init", q: "初期表示で何をする？", label: "初期表示", type: "logic", noHas: true, src: SCREEN_SRC },
+      { id: "el", q: "画面の要素は？", label: "画面の要素", type: "elements", src: SCREEN_SRC },
+      { id: "events", q: "画面内で発火するイベントは？", label: "イベント", type: "events", src: SCREEN_SRC }
+    ],
+    nonfunc: [
+      q("nf_env", "対応するブラウザと画面幅は？(任意)", "対応ブラウザ・画面幅", { optional: true })
+    ],
+    modOnly: [
+      q("mod_impact", "既存影響は？", "既存影響", { always: true }),
+      q("mod_doc", "画面設計書の書き直しは必要？", "画面設計書の書き直し要否", { always: true })
+    ]
+  },
+  /* 不具合の報告と修正。作成区分を持たず、節の構成が他のジャンルと異なる */
+  bug: {
+    name: "エラーチケット",
+    storyLabel: "概要",
+    storyHint: "どんな不具合か(一言で)",
+    sections: [
+      { key: "sym", title: "事象", nodes: [
+        q("b_what", "何が起きている？", "事象"),
+        q("b_expect", "本来はどうあるべき？", "期待動作"),
+        Object.assign(list("b_steps", "再現手順は？", "再現手順", "手順"), { numbered: true }),
+        q("b_env", "どの環境で起きた？(環境名、ビルド、発生日時)", "環境"),
+        list("b_proof", "証跡は？(ログ、スクリーンショット、リクエストID)", "証跡", "証跡の場所やID"),
+        { id: "b_freq", q: "どのくらいの頻度で起きる？", label: "発生頻度", type: "choice",
+          options: ["毎回", "ときどき", "一度だけ"] },
+        q("b_impact", "誰に、どの機能に影響する？", "影響範囲"),
+        { id: "b_wa", q: "回避策はある？", label: "回避策", type: "choice", options: ["ある", "ない"],
+          branches: { "ある": [q("b_wa_how", "どう回避する？", "回避の方法")] } }
+      ] },
+      { key: "cause", title: "原因", nodes: [
+        { id: "b_cause", q: "原因は判明している？", label: "原因", type: "choice", options: ["判明している", "調査中"],
+          branches: { "判明している": [list("b_fact", "確認済みの事実は？", "確認済みの事実", "事実")] } },
+        q("b_guess", "推測していることは？(任意)", "推測", { optional: true })
+      ] },
+      { key: "ac", title: "受け入れ条件", lead: "再現手順を実行しても事象が起きず、期待動作どおりに動くこと", nodes: [
+        list("b_check", "修正後に確認することは？", "修正後の確認項目", "確認すること"),
+        q("b_side", "修正はどこに影響する？", "修正の影響範囲"),
+        { id: "b_test", q: "再発を防ぐテストは追加する？", label: "再発防止のテスト", type: "choice",
+          options: ["追加する", "追加しない"],
+          branches: { "追加する": [q("b_test_what", "どのテストを追加する？", "追加するテスト")],
+                      "追加しない": [q("b_test_why", "追加しない理由は？", "追加しない理由")] } }
+      ] }
+    ]
+  }
+};
+
+/* 「その他」欄のID。子を持つ項目ごとに1つ。分岐を持つ項目は選択値ごとに分ける。 */
+function etcId(node, val) {
+  if (node.branches) return node.branches[val] ? node.id + ":" + val + "__etc" : null;
+  if (node.children) return node.id + "__etc";
+  return null;
+}
+function kidsOf(node, val) {
+  return (node.children || []).concat(node.branches && node.branches[val] ? node.branches[val] : []);
+}
+function valueOf(node, v) {
+  const raw = v[node.id];
+  if (node.type === "multi") return (raw || []).join("、");
+  if (node.type === "list") {
+    const arr = Array.isArray(raw) ? raw : String(raw || "").split("\n");
+    return arr.map(s => String(s).trim()).filter(Boolean).join("\n");
+  }
+  return (raw || "").trim();
+}
+
+/* state = { genre, fmt, v: { id: 値 } } からチケット本文を作る */
+function buildTicket(state) {
+  const g = GENRES[state.genre];
+  const wiki = state.fmt !== "md";
+  const v = state.v || {};
+  const sparseAll = v.mod === MOD;   /* 既存改修は、記載のある項目だけを出力する */
+  let missing = 0;
+
+  const esc = s => wiki ? s.replace(/[{}\[\]]/g, "\\$&") : s;
+  const H = (lv, s) => (wiki ? "h" + lv + ". " : "#".repeat(lv) + " ") + s;
+  /* d は深さ(数値)、または "b"(箇条書き)と "n"(番号付き)の並び */
+  const typesOf = d => Array.isArray(d) ? d : Array(d).fill("b");
+  const deeper = (d, t) => typesOf(d).concat(t || "b");
+  const B = (d, s) => {
+    const ts = typesOf(d);
+    if (wiki) return ts.map(t => t === "n" ? "#" : "*").join("") + " " + s;
+    const indent = ts.slice(0, -1).reduce((n, t) => n + (t === "n" ? 3 : 2), 0);
+    return " ".repeat(indent) + (ts[ts.length - 1] === "n" ? "1. " : "- ") + s;
+  };
+  const str = id => (v[id] || "").trim();
+
+  /* 値を「ラベル: 値」または複数行の子箇条書きにする */
+  function valued(d, label, val) {
+    const ls = val.split("\n").map(s => s.trim()).filter(Boolean);
+    if (ls.length === 1) return [B(d, label + ": " + esc(ls[0]))];
+    return [B(d, label)].concat(ls.map(l => B(deeper(d), esc(l))));
+  }
+  function etc(id, d) {
+    const val = id ? str(id) : "";
+    return val ? valued(d, "その他", val) : [];
+  }
+  function errLines(node, d, sparse) {
+    const kind = str(node.id + "_kind");
+    if (!kind) {
+      if (sparse) return [];
+      missing++; return [B(d, node.label + ": " + MISSING)];
+    }
+    if (kind === "その他") {
+      const free = str(node.id + "_efree");
+      if (free) return valued(d, node.label, free);
+      if (sparse) return [B(d, node.label + ": その他")];
+      missing++; return [B(d, node.label + ": " + MISSING)];
+    }
+    const res = [B(d, node.label + ": " + kind)];
+    [["_eid", "エラーID"], ["_emsg", "エラーメッセージ"], ["_elog", "ログレベル"]].forEach(([suf, label]) => {
+      const val = str(node.id + suf);
+      if (val) res.push(...valued(d + 1, label, val));
+      else if (!sparse) { missing++; res.push(B(d + 1, label + ": " + MISSING)); }
+    });
+    if (kind === "エラー画面") res.push(...etc(node.id + "_eetc", d + 1));
+    return res;
+  }
+  /* 種類(モーダル / 画面 / その他)を持つエラーの記載。o は ek, eid, emsg, elog, eetc, efree を持つ */
+  function errBlock(o, ts, label, sparse) {
+    const kind = (o.ek || "").trim();
+    if (!kind) {
+      if (sparse) return [];
+      missing++; return [B(ts, label + ": " + MISSING)];
+    }
+    if (kind === "その他") {
+      const freeText = (o.efree || "").trim();
+      if (freeText) return valued(ts, label, freeText);
+      if (sparse) return [B(ts, label + ": その他")];
+      missing++; return [B(ts, label + ": " + MISSING)];
+    }
+    const res = [B(ts, label + ": " + kind)];
+    [["eid", "エラーID"], ["emsg", "エラーメッセージ"], ["elog", "ログレベル"]].forEach(([key, l]) => {
+      const val = (o[key] || "").trim();
+      if (val) res.push(...valued(deeper(ts), l, val));
+      else if (!sparse) { missing++; res.push(B(deeper(ts), l + ": " + MISSING)); }
+    });
+    const extra = (o.eetc || "").trim();
+    if (kind === "エラー画面" && extra) res.push(...valued(deeper(ts), "その他", extra));
+    return res;
+  }
+  /* 画面の要素。1要素ごとに、種類、スタイリング、型、不正時、表示条件を持つ */
+  function elementsLines(node, d, sparse) {
+    let kids;
+    if (v[node.id + "_src"] === REF) {
+      const link = str(node.id + "_link");
+      const src = node.src || LOGIC_SRC;
+      if (link) kids = valued(d + 1, src, link);
+      else if (sparse) kids = [];
+      else { missing++; kids = [B(d + 1, src + ": " + MISSING)]; }
+    } else {
+      const els = Array.isArray(v[node.id]) ? v[node.id] : [];
+      kids = els.flatMap(e => {
+        const name = (e.name || "").trim();
+        const body = [];
+        const add = (label, raw) => {
+          const val = (raw || "").trim();
+          if (val) body.push(...valued(d + 2, label, val));
+          else if (!sparse) { missing++; body.push(B(d + 2, label + ": " + MISSING)); }
+        };
+        add("種類", e.kind);
+        add("スタイリング", e.style);
+        if (e.kind === "入力") {   /* 型と不正時の扱いは、入力要素にだけ問う */
+          add("型・桁・必須", e.type);
+          body.push(...errBlock(e.bad || {}, d + 2, "入力が不正な場合", sparse));
+        }
+        add("表示条件・操作条件", e.cond);
+        if (!name) {
+          if (sparse) return body.length ? [B(d + 1, "要素")].concat(body) : [];
+          missing++; return [B(d + 1, MISSING)].concat(body);
+        }
+        return [B(d + 1, esc(name))].concat(body);
+      });
+      if (!kids.length && !sparse) { missing++; kids = [B(d + 1, MISSING)]; }
+    }
+    kids = kids.concat(etc(node.id + "__etc", d + 1));
+    if (sparse && !kids.length) return [];
+    return [B(d, node.label)].concat(kids);
+  }
+  /* ロジックの工程。処理実行と条件分岐は互いに入れ子にできる */
+  function stepLines(step, ts, sparse) {
+    const text = (step.text || "").trim();
+    const note = (step.note || "").trim();
+    if (step.kind === "err") {
+      const label = "エラーハンドリング";
+      const noteL = note ? valued(deeper(ts), "補足", note) : [];
+      const ls = errBlock(step, ts, label, sparse);
+      if (!ls.length) return noteL.length ? [B(ts, label)].concat(noteL) : [];
+      return ls.concat(noteL);
+    }
+    const isIf = step.kind === "if";
+    let body = [];
+    if (isIf) {
+      [["then", "満たす場合"], ["else", "満たさない場合"]].forEach(([key, label]) => {
+        const ls = stepsLines(step[key], deeper(deeper(ts), "n"), sparse);
+        if (ls.length) body.push(B(deeper(ts), label), ...ls);
+        else if (!sparse) { missing++; body.push(B(deeper(ts), label + ": " + MISSING)); }
+      });
+    } else {
+      body = stepsLines(step.kids, deeper(ts, "n"), sparse);
+    }
+    if (note) body.push(...valued(deeper(ts), "補足", note));
+    const prefix = isIf ? "条件分岐: " : "";
+    if (!text) {
+      if (sparse) return body.length ? [B(ts, isIf ? "条件分岐" : "処理実行")].concat(body) : [];
+      missing++;
+      return [B(ts, prefix + MISSING)].concat(body);
+    }
+    return [B(ts, prefix + esc(text))].concat(body);
+  }
+  function stepsLines(arr, ts, sparse) {
+    return (Array.isArray(arr) ? arr : []).flatMap(s => stepLines(s, ts, sparse));
+  }
+  function logicLines(node, d, sparse) {
+    const has = node.noHas ? HAS : str(node.id + "_has");
+    if (!has) {
+      if (sparse) return [];
+      missing++; return [B(d, node.label + ": " + MISSING)];
+    }
+    if (has === HAS_NOT) return [B(d, node.label + ": なし")];
+    let kids;
+    if (v[node.id + "_src"] === REF) {
+      const link = str(node.id + "_link");
+      const src = node.src || LOGIC_SRC;
+      if (link) kids = valued(d + 1, src, link);
+      else if (sparse) kids = [];
+      else { missing++; kids = [B(d + 1, src + ": " + MISSING)]; }
+    } else {
+      kids = stepsLines(v[node.id + "_steps"], deeper(d, "n"), sparse);
+      if (!kids.length && !sparse) { missing++; kids = [B(d + 1, "処理の順序: " + MISSING)]; }
+    }
+    kids = kids.concat(etc(node.id + "__etc", d + 1));
+    if (sparse && !kids.length) return [];
+    return [B(d, node.label)].concat(kids);
+  }
+  /* 画面のイベント。イベントごとに、きっかけと処理の工程を持つ */
+  function eventsLines(node, d, sparse) {
+    let kids;
+    if (v[node.id + "_src"] === REF) {
+      const link = str(node.id + "_link");
+      const src = node.src || LOGIC_SRC;
+      if (link) kids = valued(d + 1, src, link);
+      else if (sparse) kids = [];
+      else { missing++; kids = [B(d + 1, src + ": " + MISSING)]; }
+    } else {
+      const evs = Array.isArray(v[node.id]) ? v[node.id] : [];
+      kids = evs.flatMap(ev => {
+        const name = (ev.name || "").trim(), trig = (ev.trig || "").trim();
+        const body = [];
+        if (trig) body.push(...valued(d + 2, "きっかけ", trig));
+        else if (!sparse) { missing++; body.push(B(d + 2, "きっかけ: " + MISSING)); }
+        const st = stepsLines(ev.steps, deeper(d + 2, "n"), sparse);
+        if (st.length) body.push(B(d + 2, "処理"), ...st);
+        else if (!sparse) { missing++; body.push(B(d + 2, "処理: " + MISSING)); }
+        if (!name) {
+          if (sparse) return body.length ? [B(d + 1, "イベント")].concat(body) : [];
+          missing++; return [B(d + 1, MISSING)].concat(body);
+        }
+        return [B(d + 1, esc(name))].concat(body);
+      });
+      if (!kids.length && !sparse) { missing++; kids = [B(d + 1, MISSING)]; }
+    }
+    kids = kids.concat(etc(node.id + "__etc", d + 1));
+    if (sparse && !kids.length) return [];
+    return [B(d, node.label)].concat(kids);
+  }
+  function lines(node, d) {
+    /* optional の項目は、空なら出力しない */
+    const sparse = (sparseAll || node.optional) && !node.always;
+    if (node.type === "logic") return logicLines(node, d, sparse);
+    if (node.type === "events") return eventsLines(node, d, sparse);
+    if (node.type === "elements") return elementsLines(node, d, sparse);
+    if (node.type === "error") return errLines(node, d, sparse);
+    if (node.type === "group") {
+      let kids;
+      if (node.refChildren && v[node.id + "_src"] === REF) {
+        /* 原典を参照する場合は、リンクだけを載せて項目の記載を省略する */
+        const link = str(node.id + "_link");
+        if (link) kids = valued(d + 1, g.srcLabel, link);
+        else if (sparse) kids = [];
+        else { missing++; kids = [B(d + 1, g.srcLabel + ": " + MISSING)]; }
+        kids = kids.concat(node.refChildren.flatMap(c => lines(c, d + 1)));
+      } else {
+        kids = node.children.flatMap(c => lines(c, d + 1));
+      }
+      kids = kids.concat(etc(node.id + "__etc", d + 1));
+      if (sparse && !kids.length) return [];
+      return [B(d, node.label)].concat(kids);
+    }
+    const val = valueOf(node, v);
+    const kids = kidsOf(node, val).flatMap(c => lines(c, d + 1)).concat(etc(etcId(node, val), d + 1));
+    if (!val) {
+      if (sparse) return kids.length ? [B(d, node.label)].concat(kids) : [];
+      missing++;
+      return [B(d, node.label + ": " + MISSING)].concat(kids);
+    }
+    if (node.type === "list")
+      return [B(d, node.label)].concat(val.split("\n").map(l => B(node.numbered ? deeper(d, "n") : d + 1, esc(l))), kids);
+    return valued(d, node.label, val).concat(kids);
+  }
+  function free(id) {
+    const val = str(id);
+    if (!val) { missing++; return [MISSING]; }
+    return val.split("\n").map(l => esc(l.replace(/\s+$/, "")));
+  }
+  function section(title, nodes, etcKey) {
+    const body = nodes.flatMap(n => lines(n, 1)).concat(etc(etcKey, 1));
+    return { title, body };
+  }
+
+  /* 節の構成を自前で持つジャンル(エラーチケット) */
+  if (g.sections) {
+    const o = [H(3, g.storyLabel || "ストーリー"), ...free("story")];
+    g.sections.forEach(sec => {
+      o.push("", H(3, sec.title));
+      if (sec.lead) o.push(B(1, sec.lead));
+      o.push(...sec.nodes.flatMap(n => lines(n, 1)), ...etc(sec.key + "__etc", 1));
+    });
+    o.push("", H(3, "依存関係・環境"), ...free("deps"));
+    o.push("", H(3, "参考情報"), ...free("refs"));
+    if (!str("title")) missing++;
+    return { text: o.join("\n"), missing };
+  }
+
+  /* 受け入れ条件の先頭行: 〇〇APIが新規作成されていること */
+  let name = str("api_name").replace(new RegExp(g.noun + "$", "i"), "").trim();
+  if (!name) { name = MISSING; missing++; }
+  let lead;
+  if (v.mod === NEW) lead = B(1, esc(name) + g.noun + "が新規作成されていること");
+  else if (v.mod === MOD) lead = B(1, esc(name) + g.noun + "が改修されていること");
+  else { lead = B(1, "作成区分: " + MISSING); missing++; }
+
+  const secs = [
+    section("機能要件", g.func, "func__etc"),
+    section("非機能要件", g.nonfunc, "nonfunc__etc"),
+    section("その他", sparseAll ? g.modOnly : [], "other__etc")
+  ];
+
+  const out = [];
+  out.push(H(3, "ストーリー"), ...free("story"), "");
+  out.push(H(3, "受け入れ条件"), lead);
+  secs.forEach(s => {
+    if (!s.body.length) {
+      if (!sparseAll) return;            /* 新規作成で中身がない節は出さない */
+      s.body = ["変更なし"];
+    }
+    out.push("", H(4, s.title), ...s.body);
+  });
+  out.push("", H(3, "依存関係・環境"), ...free("deps"));
+  out.push("", H(3, "参考情報"), ...free("refs"));
+
+  if (!str("title")) missing++;
+  return { text: out.join("\n"), missing };
+}
+/* ===== ここまで ===== */
+</script>
+
+<script>
+/* ===== 画面 ===== */
+const KEY = "ticket-builder:v1";
+let state = { genre: "api", fmt: "wiki", all: {}, c: [] };
+try {
+  const saved = JSON.parse(localStorage.getItem(KEY) || "null");
+  if (saved) {
+    if (!saved.all && saved.v) saved.all = { api: saved.v };   /* 旧形式の入力をAPI作成へ引き継ぐ */
+    delete saved.v;
+    state = Object.assign(state, saved);
+  }
+} catch (e) { /* 保存領域が使えない環境では保存なしで動く */ }
+if (!GENRES[state.genre] || !(GENRES[state.genre].func || GENRES[state.genre].sections)) state.genre = "api";
+/* state.v は、選択中のジャンルの入力を指す */
+function useGenre(key) {
+  state.genre = key;
+  if (!state.all[key]) state.all[key] = {};
+  state.v = state.all[key];
+}
+useGenre(state.genre);
+/* 階層の色。寒色と暖色を交互に並べ、7階層で一巡する */
+const LEVELS = ["#1E3A8A", "#8A6234", "#0B1B3A", "#4F6DAE", "#6B4F2E", "#51607F", "#7A705F"];
+const openEtc = new Set();   /* 開いている「その他」欄 */
+const collapsed = new Set(state.c || []);   /* 閉じている階層 */
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+};
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ genre: state.genre, fmt: state.fmt, all: state.all, c: state.c }));
+  } catch (e) {}
+}
+function grow(t) { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
+
+function field(id, text, ph) {
+  const wrap = el("div", "node");
+  const lab = el("label", null, text);
+  lab.htmlFor = "f_" + id;
+  const ta = el("textarea");
+  ta.id = "f_" + id; ta.rows = 1; ta.value = state.v[id] || "";
+  if (ph) ta.placeholder = ph;
+  ta.addEventListener("input", () => { state.v[id] = ta.value; grow(ta); refresh(); });
+  wrap.append(lab, ta);
+  return wrap;
+}
+
+/* 選択肢。multi は複数選択、それ以外は単一選択(もう一度押すと解除) */
+function chips(id, label, options, multi) {
+  const box = el("div", "chips");
+  box.setAttribute("role", "group");
+  box.setAttribute("aria-label", label);
+  options.forEach(opt => {
+    const b = el("button", "chip", opt);
+    b.type = "button";
+    const cur = state.v[id];
+    const on = multi ? (cur || []).includes(opt) : cur === opt;
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    b.addEventListener("click", () => {
+      if (multi) {
+        const set = new Set(state.v[id] || []);
+        set.has(opt) ? set.delete(opt) : set.add(opt);
+        state.v[id] = options.filter(o => set.has(o));
+      } else {
+        state.v[id] = state.v[id] === opt ? "" : opt;
+      }
+      renderForm(); refresh();
+    });
+    box.append(b);
+  });
+  return box;
+}
+
+/* 「その他」欄。記入があるか、開いた場合だけ入力欄を出す */
+function etcField(id) {
+  if ((state.v[id] || "").trim() || openEtc.has(id)) return field(id, "その他", "上の項目に当てはまらない条件や例外");
+  const b = el("button", "etc-btn", "＋ その他を書く");
+  b.type = "button";
+  b.addEventListener("click", () => {
+    openEtc.add(id); renderForm();
+    const t = $("f_" + id); if (t) t.focus();
+  });
+  return b;
+}
+
+/* 1項目につき1つの入力欄。＋ボタンで項目を増やす */
+function listControl(node) {
+  let arr = state.v[node.id];
+  if (typeof arr === "string") arr = arr.split("\n");
+  if (!Array.isArray(arr) || !arr.length) arr = [""];
+  state.v[node.id] = arr;
+  const box = el("div", "rows");
+  box.setAttribute("role", "group");
+  box.setAttribute("aria-label", node.label);
+  const add = () => {
+    arr.push(""); renderForm(); refresh();
+    const t = $("f_" + node.id + "_" + (arr.length - 1)); if (t) t.focus();
+  };
+  arr.forEach((val, i) => {
+    const row = el("div", "row");
+    const inp = el("input");
+    inp.type = "text"; inp.id = "f_" + node.id + "_" + i; inp.value = val;
+    inp.placeholder = node.ph || "";
+    inp.setAttribute("aria-label", node.label + " " + (i + 1));
+    inp.addEventListener("input", () => { arr[i] = inp.value; refresh(); });
+    inp.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); add(); } });
+    const del = el("button", "del", "×");
+    del.type = "button";
+    del.setAttribute("aria-label", node.label + " " + (i + 1) + " を削除");
+    del.addEventListener("click", () => { arr.splice(i, 1); renderForm(); refresh(); });
+    row.append(inp, del);
+    box.append(row);
+  });
+  const plus = el("button", "etc-btn", "＋ 項目を追加");
+  plus.type = "button";
+  plus.addEventListener("click", add);
+  box.append(plus);
+  return box;
+}
+
+/* ロジックの工程の一覧。末尾のボタンで処理実行か条件分岐を足す */
+function renderSteps(arr, pid, isChild) {
+  const box = el("div", "steps");
+  arr.forEach((st, i) => box.append(renderStep(arr, i, pid + "_" + i)));
+  const add = el("div", "links");
+  const kinds = [["do", "＋ 処理実行"], ["if", "＋ 条件分岐"]];
+  if (isChild) kinds.push(["err", "＋ エラーハンドリング"]);   /* 子の工程にだけ足せる */
+  kinds.forEach(([kind, label]) => {
+    const b = el("button", "etc-btn", label);
+    b.type = "button";
+    b.addEventListener("click", () => {
+      arr.push(kind === "if" ? { kind, text: "", then: [], else: [] }
+        : kind === "err" ? { kind, ek: "" } : { kind, text: "", kids: [] });
+      renderForm(); refresh();
+      const t = $(pid + "_" + (arr.length - 1)); if (t) t.focus();
+    });
+    add.append(b);
+  });
+  box.append(add);
+  return box;
+}
+
+/* 工程の値に結び付いた入力欄 */
+function stepField(st, key, id, text) {
+  const w = el("div", "node");
+  const lab = el("label", null, text);
+  lab.htmlFor = id;
+  const ta = el("textarea");
+  ta.id = id; ta.rows = 1; ta.value = st[key] || "";
+  ta.addEventListener("input", () => { st[key] = ta.value; grow(ta); refresh(); });
+  w.append(lab, ta);
+  return w;
+}
+
+/* エラーハンドリングの工程。種類を選ぶと、種類に応じた入力欄が出る */
+function renderErrStep(arr, i, sid) {
+  const st = arr[i];
+  const noteShown = !!(st.note || "").trim() || st.noteOpen;
+  const wrap = el("div", "step");
+  const head = el("div", "step-head");
+  if (st.ek || noteShown) {
+    const t = el("button", "tog", st.closed ? "▸" : "▾");
+    t.type = "button";
+    t.setAttribute("aria-expanded", st.closed ? "false" : "true");
+    t.setAttribute("aria-label", "工程 " + (i + 1) + (st.closed ? " を開く" : " を閉じる"));
+    t.addEventListener("click", () => { st.closed = !st.closed; save(); renderForm(); });
+    head.append(t);
+  }
+  head.append(el("span", "badge err", (i + 1) + ". エラーハンドリング"), el("span", "spacer"));
+  const del = el("button", "del", "×");
+  del.type = "button";
+  del.setAttribute("aria-label", "工程 " + (i + 1) + " を削除");
+  del.addEventListener("click", () => { arr.splice(i, 1); renderForm(); refresh(); });
+  head.append(del);
+  const kinds = el("div", "chips");
+  kinds.setAttribute("role", "group");
+  kinds.setAttribute("aria-label", "エラーハンドリングの種類");
+  ERR_KINDS.forEach(opt => {
+    const b = el("button", "chip", opt);
+    b.type = "button";
+    b.setAttribute("aria-pressed", st.ek === opt ? "true" : "false");
+    b.addEventListener("click", () => { st.ek = st.ek === opt ? "" : opt; renderForm(); refresh(); });
+    kinds.append(b);
+  });
+  wrap.append(head, kinds);
+  if (st.closed) return wrap;
+
+  const box = el("div", "kids");
+  if (st.ek === "その他") {
+    box.append(stepField(st, "efree", sid + "f", "どう対処する？"));
+  } else if (st.ek) {
+    box.append(stepField(st, "eid", sid + "i", "エラーIDは？"));
+    box.append(stepField(st, "emsg", sid + "m", "エラーメッセージは？"));
+    box.append(stepField(st, "elog", sid + "l", "ログレベルは？"));
+    if (st.ek === "エラー画面") box.append(stepField(st, "eetc", sid + "x", "その他(ボタン配置など)"));
+  }
+  if (noteShown) {
+    const nf = stepField(st, "note", sid + "n", "補足");
+    nf.className = "note-field";
+    box.append(nf);
+  } else {
+    const links = el("div", "links");
+    const b = el("button", "etc-btn", "＋ 補足を書く");
+    b.type = "button";
+    b.addEventListener("click", () => { st.noteOpen = true; renderForm(); const t = $(sid + "n"); if (t) t.focus(); });
+    links.append(b);
+    box.append(links);
+  }
+  wrap.append(box);
+  return wrap;
+}
+
+function renderStep(arr, i, sid) {
+  const st = arr[i];
+  if (st.kind === "err") return renderErrStep(arr, i, sid);
+  const isIf = st.kind === "if";
+  ["then", "else", "kids"].forEach(k => { if ((isIf ? k !== "kids" : k === "kids") && !Array.isArray(st[k])) st[k] = []; });
+  const name = isIf ? "条件分岐" : "処理実行";
+  const hasKids = isIf || st.kids.length > 0 || st.open;
+  const noteShown = !!(st.note || "").trim() || st.noteOpen;
+  const wrap = el("div", "step");
+
+  const head = el("div", "step-head");
+  if (hasKids || noteShown) {
+    const t = el("button", "tog", st.closed ? "▸" : "▾");
+    t.type = "button";
+    t.setAttribute("aria-expanded", st.closed ? "false" : "true");
+    t.setAttribute("aria-label", "工程 " + (i + 1) + (st.closed ? " を開く" : " を閉じる"));
+    t.addEventListener("click", () => { st.closed = !st.closed; save(); renderForm(); });
+    head.append(t);
+  }
+  head.append(el("span", isIf ? "badge if" : "badge", (i + 1) + ". " + name));
+  const inp = el("input");
+  inp.type = "text"; inp.id = sid; inp.value = st.text || "";
+  inp.placeholder = isIf ? "条件" : "処理の内容";
+  inp.setAttribute("aria-label", name + " " + (i + 1));
+  inp.addEventListener("input", () => { st.text = inp.value; refresh(); });
+  const del = el("button", "del", "×");
+  del.type = "button";
+  del.setAttribute("aria-label", "工程 " + (i + 1) + " を削除");
+  del.addEventListener("click", () => {
+    const nested = isIf ? st.then.length + st.else.length : st.kids.length;
+    if (nested && !confirm("この工程と、その下の工程をまとめて削除する。")) return;
+    arr.splice(i, 1); renderForm(); refresh();
+  });
+  head.append(el("span", "spacer"), del);
+  wrap.append(head, inp);
+  if (st.closed) return wrap;
+
+  const box = el("div", "kids");
+  if (isIf) {
+    box.append(el("div", "branch", "満たす場合"), renderSteps(st.then, sid + "t", true));
+    box.append(el("div", "branch", "満たさない場合"), renderSteps(st.else, sid + "e", true));
+  } else if (hasKids) {
+    box.append(renderSteps(st.kids, sid + "k", true));
+  }
+  if (noteShown) {
+    const nf = el("div", "note-field");
+    const lab = el("label", null, "補足");
+    lab.htmlFor = sid + "n";
+    const ta = el("textarea");
+    ta.id = sid + "n"; ta.rows = 1; ta.value = st.note || "";
+    ta.addEventListener("input", () => { st.note = ta.value; grow(ta); refresh(); });
+    nf.append(lab, ta);
+    box.append(nf);
+  }
+  const links = el("div", "links");
+  if (!noteShown) {
+    const b = el("button", "etc-btn", "＋ 補足を書く");
+    b.type = "button";
+    b.addEventListener("click", () => { st.noteOpen = true; renderForm(); const t = $(sid + "n"); if (t) t.focus(); });
+    links.append(b);
+  }
+  if (!isIf && !hasKids) {
+    const b = el("button", "etc-btn", "＋ 子の工程を追加");
+    b.type = "button";
+    b.addEventListener("click", () => { st.open = true; save(); renderForm(); });
+    links.append(b);
+  }
+  if (links.children.length) box.append(links);
+  if (box.children.length) wrap.append(box);
+  return wrap;
+}
+
+/* 値の持ち主(o)に結び付いた単一選択 */
+function objChips(o, key, label, options) {
+  const box = el("div", "chips");
+  box.setAttribute("role", "group");
+  box.setAttribute("aria-label", label);
+  options.forEach(opt => {
+    const b = el("button", "chip", opt);
+    b.type = "button";
+    b.setAttribute("aria-pressed", o[key] === opt ? "true" : "false");
+    b.addEventListener("click", () => { o[key] = o[key] === opt ? "" : opt; renderForm(); refresh(); });
+    box.append(b);
+  });
+  return box;
+}
+
+/* 画面の要素1件。種類、スタイリング、型、不正時、表示条件を持つ */
+function renderElement(arr, i, eid) {
+  const it = arr[i];
+  if (!it.bad || typeof it.bad !== "object") it.bad = {};
+  const wrap = el("div", "step");
+  const head = el("div", "step-head");
+  const t = el("button", "tog", it.closed ? "▸" : "▾");
+  t.type = "button";
+  t.setAttribute("aria-expanded", it.closed ? "false" : "true");
+  t.setAttribute("aria-label", "要素 " + (i + 1) + (it.closed ? " を開く" : " を閉じる"));
+  t.addEventListener("click", () => { it.closed = !it.closed; save(); renderForm(); });
+  const title = (it.name || "").trim();
+  head.append(t, el("span", "badge", "要素 " + (i + 1) + (it.closed && title ? ": " + title : "")), el("span", "spacer"));
+  const del = el("button", "del", "×");
+  del.type = "button";
+  del.setAttribute("aria-label", "要素 " + (i + 1) + " を削除");
+  del.addEventListener("click", () => {
+    if (title && !confirm("この要素を削除する。")) return;
+    arr.splice(i, 1); renderForm(); refresh();
+  });
+  head.append(del);
+  wrap.append(head);
+  if (it.closed) return wrap;
+
+  const box = el("div", "kids");
+  box.append(stepField(it, "name", eid + "a", "要素の名前は？"));
+  const kind = el("div", "node");
+  kind.append(el("div", "q", "種類は？"), objChips(it, "kind", "要素の種類", EL_KINDS));
+  box.append(kind);
+  box.append(stepField(it, "style", eid + "s", "スタイリングは？"));
+  if (it.kind === "入力") {
+    box.append(stepField(it, "type", eid + "t", "型、桁、必須か任意かは？"));
+    const bad = el("div", "node");
+    bad.append(el("div", "q", "入力が不正な場合は？"), objChips(it.bad, "ek", "入力が不正な場合", ERR_KINDS));
+    if (it.bad.ek) {
+      const fb = el("div", "kids");
+      if (it.bad.ek === "その他") {
+        fb.append(stepField(it.bad, "efree", eid + "bf", "どう対処する？"));
+      } else {
+        fb.append(stepField(it.bad, "eid", eid + "bi", "エラーIDは？"));
+        fb.append(stepField(it.bad, "emsg", eid + "bm", "エラーメッセージは？"));
+        fb.append(stepField(it.bad, "elog", eid + "bl", "ログレベルは？"));
+        if (it.bad.ek === "エラー画面") fb.append(stepField(it.bad, "eetc", eid + "bx", "その他(ボタン配置など)"));
+      }
+      bad.append(fb);
+    }
+    box.append(bad);
+  }
+  box.append(stepField(it, "cond", eid + "c", "表示する条件、操作できる条件は？"));
+  wrap.append(box);
+  return wrap;
+}
+
+/* 画面のイベント1件。名前、きっかけ、処理の工程を持つ */
+function renderEvent(arr, i, eid) {
+  const ev = arr[i];
+  if (!Array.isArray(ev.steps)) ev.steps = [];
+  const wrap = el("div", "step");
+  const head = el("div", "step-head");
+  const t = el("button", "tog", ev.closed ? "▸" : "▾");
+  t.type = "button";
+  t.setAttribute("aria-expanded", ev.closed ? "false" : "true");
+  t.setAttribute("aria-label", "イベント " + (i + 1) + (ev.closed ? " を開く" : " を閉じる"));
+  t.addEventListener("click", () => { ev.closed = !ev.closed; save(); renderForm(); });
+  const title = (ev.name || "").trim();
+  head.append(t, el("span", "badge", "イベント " + (i + 1) + (ev.closed && title ? ": " + title : "")), el("span", "spacer"));
+  const del = el("button", "del", "×");
+  del.type = "button";
+  del.setAttribute("aria-label", "イベント " + (i + 1) + " を削除");
+  del.addEventListener("click", () => {
+    if ((title || ev.steps.length) && !confirm("このイベントと、その下の工程をまとめて削除する。")) return;
+    arr.splice(i, 1); renderForm(); refresh();
+  });
+  head.append(del);
+  wrap.append(head);
+  if (ev.closed) return wrap;
+  const box = el("div", "kids");
+  box.append(stepField(ev, "name", eid + "a", "イベントの名前は？"));
+  box.append(stepField(ev, "trig", eid + "b", "きっかけは？(クリック、入力、表示など)"));
+  const flow = el("div", "node");
+  flow.append(el("div", "q", "処理の順序は？"), renderSteps(ev.steps, eid + "s"));
+  box.append(flow);
+  wrap.append(box);
+  return wrap;
+}
+
+/* 階層を開閉するボタン */
+function toggle(key, label) {
+  const closed = collapsed.has(key);
+  const b = el("button", "tog", closed ? "▸" : "▾");
+  b.type = "button";
+  b.setAttribute("aria-expanded", closed ? "false" : "true");
+  b.setAttribute("aria-label", label + (closed ? "を開く" : "を閉じる"));
+  b.addEventListener("click", () => {
+    collapsed.has(key) ? collapsed.delete(key) : collapsed.add(key);
+    state.c = Array.from(collapsed); save(); renderForm();
+  });
+  return b;
+}
+
+function renderNode(node) {
+  const wrap = el("div", node.type === "group" ? "node group" : "node");
+  const kids = [];
+  let control = null, labelFor = null;
+  if (node.type === "group") {
+    if (node.refChildren) control = chips(node.id + "_src", "項目と形式の記載方法", [REF], false);
+    if (node.refChildren && state.v[node.id + "_src"] === REF) {
+      kids.push(field(node.id + "_link", GENRES[state.genre].srcLabel + "のリンクは？"));
+      node.refChildren.forEach(k => kids.push(renderNode(k)));
+    } else {
+      node.children.forEach(k => kids.push(renderNode(k)));
+    }
+    kids.push(etcField(node.id + "__etc"));
+  } else if (node.type === "logic") {
+    if (!node.noHas) control = chips(node.id + "_has", node.label, [HAS_NOT, HAS], false);
+    if (node.noHas || state.v[node.id + "_has"] === HAS) {
+      const src = el("div", "node");
+      src.append(el("div", "q", node.label + "の" + (node.src || LOGIC_SRC) + "はある？"),
+        chips(node.id + "_src", node.label + "の記載方法", [REF], false));
+      kids.push(src);
+      if (state.v[node.id + "_src"] === REF) {
+        kids.push(field(node.id + "_link", (node.src || LOGIC_SRC) + "のリンクは？"));
+      } else {
+        if (!Array.isArray(state.v[node.id + "_steps"])) state.v[node.id + "_steps"] = [];
+        const flow = el("div", "node");
+        flow.append(el("div", "q", "処理の順序は？"), renderSteps(state.v[node.id + "_steps"], "s_" + node.id));
+        kids.push(flow);
+      }
+      kids.push(etcField(node.id + "__etc"));
+    }
+  } else if (node.type === "events" || node.type === "elements") {
+    const isEv = node.type === "events";
+    const src = el("div", "node");
+    src.append(el("div", "q", node.label + "の" + (node.src || LOGIC_SRC) + "はある？"),
+      chips(node.id + "_src", node.label + "の記載方法", [REF], false));
+    kids.push(src);
+    if (state.v[node.id + "_src"] === REF) {
+      kids.push(field(node.id + "_link", (node.src || LOGIC_SRC) + "のリンクは？"));
+    } else {
+      if (!Array.isArray(state.v[node.id])) state.v[node.id] = [];
+      const evs = state.v[node.id];
+      evs.forEach((ev, i) => kids.push((isEv ? renderEvent : renderElement)(evs, i, "ev_" + node.id + "_" + i)));
+      const add = el("button", "etc-btn", isEv ? "＋ イベントを追加" : "＋ 要素を追加");
+      add.type = "button";
+      add.addEventListener("click", () => {
+        evs.push(isEv ? { name: "", trig: "", steps: [] } : { name: "", kind: "", bad: {} }); renderForm(); refresh();
+        const t = $("ev_" + node.id + "_" + (evs.length - 1) + "a"); if (t) t.focus();
+      });
+      kids.push(add);
+    }
+    kids.push(etcField(node.id + "__etc"));
+  } else if (node.type === "error") {
+    control = chips(node.id + "_kind", node.label, ERR_KINDS, false);
+    const kind = state.v[node.id + "_kind"];
+    if (kind === "その他") {
+      kids.push(field(node.id + "_efree", "どう対処する？"));
+    } else if (kind) {
+      kids.push(field(node.id + "_eid", "エラーIDは？"));
+      kids.push(field(node.id + "_emsg", "エラーメッセージは？"));
+      kids.push(field(node.id + "_elog", "ログレベルは？"));
+      if (kind === "エラー画面") kids.push(field(node.id + "_eetc", "その他(ボタン配置など)"));
+    }
+  } else {
+    if (node.type === "choice" || node.type === "multi") {
+      control = chips(node.id, node.label, node.options, node.type === "multi");
+    } else if (node.type === "list") {
+      control = listControl(node);
+    } else {
+      control = field(node.id, node.q, node.ph).querySelector("textarea");
+      labelFor = control.id;
+    }
+    const val = valueOf(node, state.v);
+    kidsOf(node, val).forEach(k => kids.push(renderNode(k)));
+    const eid = etcId(node, val);
+    if (eid) kids.push(etcField(eid));
+  }
+  const head = el("div", "head");
+  if (kids.length) head.append(toggle(node.id, node.label));
+  const lab = el(labelFor ? "label" : "div", "q", node.q);
+  if (labelFor) lab.htmlFor = labelFor;
+  head.append(lab);
+  wrap.append(head);
+  if (control) wrap.append(control);
+  if (kids.length && !collapsed.has(node.id)) {
+    const box = el("div", "kids");
+    kids.forEach(k => box.append(k));
+    wrap.append(box);
+  }
+  return wrap;
+}
+
+function card(key, title, sub, nodes) {
+  const closed = collapsed.has("card:" + key);
+  const c = el("section", closed ? "card closed" : "card");
+  const h = el("h2");
+  h.append(toggle("card:" + key, sub ? title + " " + sub : title), document.createTextNode(title));
+  if (sub) h.append(el("span", null, sub));
+  c.append(h);
+  if (!closed) nodes.forEach(n => c.append(n));
+  return c;
+}
+
+function renderForm() {
+  const g = GENRES[state.genre];
+  const form = $("form");
+  form.textContent = "";
+  const kind = el("div", "node");
+  kind.append(el("div", "q", "新規作成か、既存改修か"), chips("mod", "作成区分", [NEW, MOD], false));
+  const isMod = state.v.mod === MOD;
+  if (g.sections) form.append(
+    card("title", "タイトル", null, [field("title", "Jiraの要約欄に入れるタイトル")]),
+    card("story", g.storyLabel, null, [field("story", g.storyHint)]),
+    ...g.sections.map(sec => card("sec_" + sec.key, sec.title, null,
+      sec.nodes.map(renderNode).concat(etcField(sec.key + "__etc")))),
+    card("deps", "依存関係・環境", null, [field("deps", "先行チケット、他チームの成果物、対象環境")]),
+    card("refs", "参考情報", null, [field("refs", "関連チケット、設計書などのリンク")])
+  );
+  else form.append(
+    card("title", "タイトル", null, [field("title", "Jiraの要約欄に入れるタイトル")]),
+    card("story", "ストーリー", null, [field("story", "誰が、何を、なぜ必要としているか")]),
+    card("kind", "受け入れ条件", "作成区分", [field("api_name", g.noun + "の名前は？", g.example), kind]),
+    card("func", "受け入れ条件", isMod ? "機能要件(変更点だけ記入)" : "機能要件",
+      g.func.map(renderNode).concat(etcField("func__etc"))),
+    card("nonfunc", "受け入れ条件", isMod ? "非機能要件(変更点だけ記入)" : "非機能要件",
+      g.nonfunc.map(renderNode).concat(etcField("nonfunc__etc"))),
+    card("other", "受け入れ条件", "その他",
+      (isMod ? g.modOnly.map(renderNode) : []).concat(etcField("other__etc"))),
+    card("deps", "依存関係・環境", null, [field("deps", "先行チケット、他チームの成果物、対象環境")]),
+    card("refs", "参考情報", null, [field("refs", "設計書やIF定義などのリンク")])
+  );
+  /* 階層の深さに応じて、縦線と＋ボタンの色を決める */
+  form.querySelectorAll(".kids").forEach(k => {
+    let d = 1;
+    for (let p = k.parentElement; p && p !== form; p = p.parentElement) {
+      if (p.classList.contains("kids")) d++;
+    }
+    k.style.setProperty("--lv", LEVELS[d % LEVELS.length]);
+  });
+  form.querySelectorAll("textarea").forEach(grow);
+}
+
+function renderGenres() {
+  const box = $("genres");
+  box.textContent = "";
+  Object.keys(GENRES).forEach(key => {
+    const g = GENRES[key];
+    const b = el("button", "genre", g.name);
+    b.type = "button";
+    if (!g.func && !g.sections) { b.disabled = true; b.append(el("small", null, "準備中")); }
+    b.setAttribute("aria-pressed", key === state.genre ? "true" : "false");
+    b.addEventListener("click", () => { useGenre(key); openEtc.clear(); renderGenres(); renderForm(); refresh(); });
+    box.append(b);
+  });
+}
+
+function refresh() {
+  const r = buildTicket(state);
+  $("out").textContent = r.text;
+  const c = $("count");
+  c.textContent = r.missing ? "未記入 " + r.missing + " 件" : "未記入なし";
+  c.classList.toggle("done", !r.missing);
+  document.querySelectorAll("[data-fmt]").forEach(b =>
+    b.setAttribute("aria-pressed", b.dataset.fmt === state.fmt ? "true" : "false"));
+  save();
+}
+
+async function copy(text, btn, done) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; }
+  catch (e) {
+    const t = el("textarea"); t.value = text; t.style.position = "fixed"; t.style.opacity = "0";
+    document.body.append(t); t.select();
+    try { ok = document.execCommand("copy"); } catch (e2) {}
+    t.remove();
+  }
+  const orig = btn.dataset.label || btn.textContent;
+  btn.dataset.label = orig;
+  btn.textContent = ok ? done : "コピーできなかった。本文を選択してコピーする";
+  setTimeout(() => { btn.textContent = orig; }, 1800);
+}
+
+document.querySelectorAll("[data-fmt]").forEach(b =>
+  b.addEventListener("click", () => { state.fmt = b.dataset.fmt; refresh(); }));
+$("copyBody").addEventListener("click", e => copy(buildTicket(state).text, e.currentTarget, "本文をコピーした"));
+$("copyTitle").addEventListener("click", e => copy((state.v.title || "").trim(), e.currentTarget, "タイトルをコピーした"));
+$("reset").addEventListener("click", () => {
+  if (!confirm(GENRES[state.genre].name + "の入力をすべて消去する。元に戻せない。")) return;
+  state.all[state.genre] = {}; useGenre(state.genre); openEtc.clear(); renderForm(); refresh();
+});
+
+renderGenres(); renderForm(); refresh();
+</script>
+</body>
+</html>
