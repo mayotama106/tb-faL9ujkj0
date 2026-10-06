@@ -114,7 +114,7 @@
   .etc-btn:hover { background: var(--lv); color: #fff; }
   .card > .etc-btn { display: block; }
   .row { display: flex; gap: 6px; margin-bottom: 6px; }
-  .row input { flex: 1 1 auto; min-width: 0; }
+  .row textarea { flex: 1 1 auto; min-width: 0; }
   .del {
     font: inherit; color: var(--navy); background: var(--field); border: 1px solid var(--mist);
     border-radius: 8px; width: 38px; min-height: 30px; flex: 0 0 auto; cursor: pointer;
@@ -122,7 +122,7 @@
   .rows > .etc-btn { margin-top: 2px; }
   .step { margin-top: 10px; }
   .step-head { display: flex; align-items: center; gap: 6px; }
-  .step > input { margin-top: 6px; }
+  .step > textarea { margin-top: 6px; }
   .badge {
     font-size: 12px; font-weight: 700; color: #fff; background: var(--navy);
     border-radius: 999px; padding: 3px 10px; white-space: nowrap; flex: 0 0 auto;
@@ -362,13 +362,15 @@ function etcId(node, val) {
 function kidsOf(node, val) {
   return (node.children || []).concat(node.branches && node.branches[val] ? node.branches[val] : []);
 }
+/* 1項目1入力欄の値。各項目は改行を含みうる(旧形式の改行区切りの文字列も受ける) */
+function listItems(raw) {
+  const arr = Array.isArray(raw) ? raw : String(raw || "").split("\n");
+  return arr.map(s => String(s).trim()).filter(Boolean);
+}
 function valueOf(node, v) {
   const raw = v[node.id];
   if (node.type === "multi") return (raw || []).join("、");
-  if (node.type === "list") {
-    const arr = Array.isArray(raw) ? raw : String(raw || "").split("\n");
-    return arr.map(s => String(s).trim()).filter(Boolean).join("\n");
-  }
+  if (node.type === "list") return listItems(raw).join("\n");
   return (raw || "").trim();
 }
 
@@ -396,6 +398,11 @@ function buildTicket(state) {
     const ls = val.split("\n").map(s => s.trim()).filter(Boolean);
     if (ls.length === 1) return [B(d, label + ": " + esc(ls[0]))];
     return [B(d, label)].concat(ls.map(l => B(deeper(d), esc(l))));
+  }
+  /* 見出しになる値(工程、要素名、項目など)。2行目以降は子の箇条書きにする */
+  function headed(d, s) {
+    const ls = s.split("\n").map(l => l.trim()).filter(Boolean);
+    return [B(d, esc(ls[0] || ""))].concat(ls.slice(1).map(l => B(deeper(d), esc(l))));
   }
   function etc(id, d) {
     const val = id ? str(id) : "";
@@ -475,7 +482,7 @@ function buildTicket(state) {
           if (sparse) return body.length ? [B(d + 1, "要素")].concat(body) : [];
           missing++; return [B(d + 1, MISSING)].concat(body);
         }
-        return [B(d + 1, esc(name))].concat(body);
+        return headed(d + 1, name).concat(body);
       });
       if (!kids.length && !sparse) { missing++; kids = [B(d + 1, MISSING)]; }
     }
@@ -512,7 +519,7 @@ function buildTicket(state) {
       missing++;
       return [B(ts, prefix + MISSING)].concat(body);
     }
-    return [B(ts, prefix + esc(text))].concat(body);
+    return headed(ts, prefix + text).concat(body);
   }
   function stepsLines(arr, ts, sparse) {
     return (Array.isArray(arr) ? arr : []).flatMap(s => stepLines(s, ts, sparse));
@@ -562,7 +569,7 @@ function buildTicket(state) {
           if (sparse) return body.length ? [B(d + 1, "イベント")].concat(body) : [];
           missing++; return [B(d + 1, MISSING)].concat(body);
         }
-        return [B(d + 1, esc(name))].concat(body);
+        return headed(d + 1, name).concat(body);
       });
       if (!kids.length && !sparse) { missing++; kids = [B(d + 1, MISSING)]; }
     }
@@ -601,7 +608,7 @@ function buildTicket(state) {
       return [B(d, node.label + ": " + MISSING)].concat(kids);
     }
     if (node.type === "list")
-      return [B(d, node.label)].concat(val.split("\n").map(l => B(node.numbered ? deeper(d, "n") : d + 1, esc(l))), kids);
+      return [B(d, node.label)].concat(listItems(v[node.id]).flatMap(l => headed(node.numbered ? deeper(d, "n") : d + 1, l)), kids);
     return valued(d, node.label, val).concat(kids);
   }
   function free(id) {
@@ -766,12 +773,13 @@ function listControl(node) {
   };
   arr.forEach((val, i) => {
     const row = el("div", "row");
-    const inp = el("input");
-    inp.type = "text"; inp.id = "f_" + node.id + "_" + i; inp.value = val;
+    const inp = el("textarea");
+    inp.rows = 1; inp.id = "f_" + node.id + "_" + i; inp.value = val;
     inp.placeholder = node.ph || "";
     inp.setAttribute("aria-label", node.label + " " + (i + 1));
-    inp.addEventListener("input", () => { arr[i] = inp.value; refresh(); });
-    inp.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); add(); } });
+    inp.addEventListener("input", () => { arr[i] = inp.value; grow(inp); refresh(); });
+    /* Enterは改行。Ctrl+Enter(MacはCommand+Enter)で項目を足す */
+    inp.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.isComposing) { e.preventDefault(); add(); } });
     const del = el("button", "del", "×");
     del.type = "button";
     del.setAttribute("aria-label", node.label + " " + (i + 1) + " を削除");
@@ -898,11 +906,11 @@ function renderStep(arr, i, sid) {
     head.append(t);
   }
   head.append(el("span", isIf ? "badge if" : "badge", (i + 1) + ". " + name));
-  const inp = el("input");
-  inp.type = "text"; inp.id = sid; inp.value = st.text || "";
+  const inp = el("textarea");
+  inp.rows = 1; inp.id = sid; inp.value = st.text || "";
   inp.placeholder = isIf ? "条件" : "処理の内容";
   inp.setAttribute("aria-label", name + " " + (i + 1));
-  inp.addEventListener("input", () => { st.text = inp.value; refresh(); });
+  inp.addEventListener("input", () => { st.text = inp.value; grow(inp); refresh(); });
   const del = el("button", "del", "×");
   del.type = "button";
   del.setAttribute("aria-label", "工程 " + (i + 1) + " を削除");
@@ -1294,7 +1302,7 @@ function renderSaved() {
 }
 /* タイトルを見出しにし、本文を続けたMarkdownファイルを保存させる */
 function downloadMd(genre, v) {
-  const title = (v.title || "").trim();
+  const title = (v.title || "").trim().replace(/\s*\n\s*/g, " ");
   const body = buildTicket({ genre, v }).text;
   const text = "# " + (title || "(タイトルなし)") + "\n\n" + body + "\n";
   const name = (title || GENRES[genre].name).replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 80) + ".md";
