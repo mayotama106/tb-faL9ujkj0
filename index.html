@@ -137,6 +137,12 @@
   .note-field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
   .spacer { flex: 1 1 auto; }
   .note { margin: 12px 0 0; font-size: 13px; color: #4a5672; }
+  .ed-node { background: var(--field); border: 1px solid var(--mist); border-radius: 10px; padding: 10px 12px; }
+  .ed-node .node label { font-size: 13px; }
+  .ed-check { display: block; font-size: 13px; margin-top: 8px; }
+  .ed-list > .links { margin-top: 4px; }
+  .ed-note { margin: 0 0 12px; }
+  .del:disabled { opacity: 0.35; cursor: default; }
   .saved { margin-top: 20px; }
   .saved ul { list-style: none; margin: 0; padding: 0; }
   .saved li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--mist); }
@@ -353,6 +359,14 @@ const GENRES = {
   }
 };
 
+/* 本文の見出しと定型文。ジャンルの heads で上書きできる(テンプレートの編集) */
+const HEADS = {
+  story: "ストーリー", ac: "受け入れ条件", func: "機能要件", nonfunc: "非機能要件", other: "その他",
+  deps: "依存関係・環境", refs: "参考情報",
+  leadNew: "{名前}が新規作成されていること", leadMod: "{名前}が改修されていること"
+};
+const headsOf = g => Object.assign({}, HEADS, g.heads || {});
+
 /* 「その他」欄のID。子を持つ項目ごとに1つ。分岐を持つ項目は選択値ごとに分ける。 */
 function etcId(node, val) {
   if (node.branches) return node.branches[val] ? node.id + ":" + val + "__etc" : null;
@@ -377,6 +391,7 @@ function valueOf(node, v) {
 /* state = { genre, v: { id: 値 } } から、Markdownのチケット本文を作る */
 function buildTicket(state) {
   const g = GENRES[state.genre];
+  const h = headsOf(g);
   const v = state.v || {};
   const sparseAll = v.mod === MOD;   /* 既存改修は、記載のある項目だけを出力する */
   let missing = 0;
@@ -629,8 +644,8 @@ function buildTicket(state) {
       if (sec.lead) o.push(B(1, sec.lead));
       o.push(...sec.nodes.flatMap(n => lines(n, 1)), ...etc(sec.key + "__etc", 1));
     });
-    o.push("", H(3, "依存関係・環境"), ...free("deps"));
-    o.push("", H(3, "参考情報"), ...free("refs"));
+    o.push("", H(3, h.deps), ...free("deps"));
+    o.push("", H(3, h.refs), ...free("refs"));
     if (!str("title")) missing++;
     return { text: o.join("\n"), missing };
   }
@@ -639,19 +654,20 @@ function buildTicket(state) {
   let name = str("api_name").replace(new RegExp(g.noun + "$", "i"), "").trim();
   if (!name) { name = MISSING; missing++; }
   let lead;
-  if (v.mod === NEW) lead = B(1, esc(name) + g.noun + "が新規作成されていること");
-  else if (v.mod === MOD) lead = B(1, esc(name) + g.noun + "が改修されていること");
+  const fill = t => t.split("{名前}").join(esc(name) + g.noun);
+  if (v.mod === NEW) lead = B(1, fill(h.leadNew));
+  else if (v.mod === MOD) lead = B(1, fill(h.leadMod));
   else { lead = B(1, "作成区分: " + MISSING); missing++; }
 
   const secs = [
-    section("機能要件", g.func, "func__etc"),
-    section("非機能要件", g.nonfunc, "nonfunc__etc"),
-    section("その他", sparseAll ? g.modOnly : [], "other__etc")
+    section(h.func, g.func, "func__etc"),
+    section(h.nonfunc, g.nonfunc, "nonfunc__etc"),
+    section(h.other, sparseAll ? g.modOnly : [], "other__etc")
   ];
 
   const out = [];
-  out.push(H(3, "ストーリー"), ...free("story"), "");
-  out.push(H(3, "受け入れ条件"), lead);
+  out.push(H(3, h.story), ...free("story"), "");
+  out.push(H(3, h.ac), lead);
   secs.forEach(s => {
     if (!s.body.length) {
       if (!sparseAll) return;            /* 新規作成で中身がない節は出さない */
@@ -659,8 +675,8 @@ function buildTicket(state) {
     }
     out.push("", H(4, s.title), ...s.body);
   });
-  out.push("", H(3, "依存関係・環境"), ...free("deps"));
-  out.push("", H(3, "参考情報"), ...free("refs"));
+  out.push("", H(3, h.deps), ...free("deps"));
+  out.push("", H(3, h.refs), ...free("refs"));
 
   if (!str("title")) missing++;
   return { text: out.join("\n"), missing };
@@ -671,6 +687,22 @@ function buildTicket(state) {
 <script>
 /* ===== 画面 ===== */
 const KEY = "ticket-builder:v1";
+/* 編集したテンプレート。初期状態と異なるジャンルだけを { ジャンル: 定義 } で持つ */
+const TPL_KEY = "ticket-builder:templates:v1";
+const clone = o => JSON.parse(JSON.stringify(o));
+const DEFAULT_GENRES = clone(GENRES);
+try {
+  const t = JSON.parse(localStorage.getItem(TPL_KEY) || "null");
+  if (t) Object.keys(t).forEach(k => { if (GENRES[k]) GENRES[k] = t[k]; });
+} catch (e) {}
+function saveTpl() {
+  const t = {};
+  Object.keys(GENRES).forEach(k => {
+    if (JSON.stringify(GENRES[k]) !== JSON.stringify(DEFAULT_GENRES[k])) t[k] = GENRES[k];
+  });
+  try { localStorage.setItem(TPL_KEY, JSON.stringify(t)); } catch (e) {}
+}
+let editing = false;   /* テンプレートの編集中 */
 let state = { genre: "api", all: {}, c: [] };
 try {
   const saved = JSON.parse(localStorage.getItem(KEY) || "null");
@@ -1176,7 +1208,9 @@ function card(key, title, sub, nodes) {
 }
 
 function renderForm() {
+  if (editing) return renderEditor();
   const g = GENRES[state.genre];
+  const h = headsOf(g);
   const form = $("form");
   form.textContent = "";
   const kind = el("div", "node");
@@ -1187,21 +1221,21 @@ function renderForm() {
     card("story", g.storyLabel, null, [field("story", g.storyHint)]),
     ...g.sections.map(sec => card("sec_" + sec.key, sec.title, null,
       sec.nodes.map(renderNode).concat(etcField(sec.key + "__etc")))),
-    card("deps", "依存関係・環境", null, [field("deps", "先行チケット、他チームの成果物、対象環境")]),
-    card("refs", "参考情報", null, [field("refs", "関連チケット、設計書などのリンク")])
+    card("deps", h.deps, null, [field("deps", "先行チケット、他チームの成果物、対象環境")]),
+    card("refs", h.refs, null, [field("refs", "関連チケット、設計書などのリンク")])
   );
   else form.append(
     card("title", "タイトル", null, [field("title", "Jiraの要約欄に入れるタイトル")]),
-    card("story", "ストーリー", null, [field("story", "誰が、何を、なぜ必要としているか")]),
-    card("kind", "受け入れ条件", "作成区分", [field("api_name", g.noun + "の名前は？", g.example), kind]),
-    card("func", "受け入れ条件", isMod ? "機能要件(変更点だけ記入)" : "機能要件",
+    card("story", h.story, null, [field("story", "誰が、何を、なぜ必要としているか")]),
+    card("kind", h.ac, "作成区分", [field("api_name", g.noun + "の名前は？", g.example), kind]),
+    card("func", h.ac, isMod ? h.func + "(変更点だけ記入)" : h.func,
       g.func.map(renderNode).concat(etcField("func__etc"))),
-    card("nonfunc", "受け入れ条件", isMod ? "非機能要件(変更点だけ記入)" : "非機能要件",
+    card("nonfunc", h.ac, isMod ? h.nonfunc + "(変更点だけ記入)" : h.nonfunc,
       g.nonfunc.map(renderNode).concat(etcField("nonfunc__etc"))),
-    card("other", "受け入れ条件", "その他",
+    card("other", h.ac, h.other,
       (isMod ? g.modOnly.map(renderNode) : []).concat(etcField("other__etc"))),
-    card("deps", "依存関係・環境", null, [field("deps", "先行チケット、他チームの成果物、対象環境")]),
-    card("refs", "参考情報", null, [field("refs", "設計書やIF定義などのリンク")])
+    card("deps", h.deps, null, [field("deps", "先行チケット、他チームの成果物、対象環境")]),
+    card("refs", h.refs, null, [field("refs", "設計書やIF定義などのリンク")])
   );
   /* 階層の深さに応じて、縦線と＋ボタンの色を決める */
   form.querySelectorAll(".kids").forEach(k => {
@@ -1212,6 +1246,157 @@ function renderForm() {
     k.style.setProperty("--lv", LEVELS[d % LEVELS.length]);
   });
   form.querySelectorAll("textarea").forEach(grow);
+}
+
+/* ===== テンプレートの編集 =====
+   観点表の問い(文言、本文での表記、並び、追加、削除)と、本文の見出し・定型文を編集する。
+   同じIDの問いが複数の場所にある(原典参照時に残す問いなど)ので、文言の変更と削除はIDで揃える */
+const TYPE_NAMES = { text: "自由記述", list: "項目の一覧", choice: "選択式", multi: "複数選択", group: "見出し",
+  error: "エラーハンドリング", logic: "工程", elements: "画面の要素", events: "イベント" };
+function nodeArrays(g) {
+  const out = [];
+  const walk = arr => {
+    if (!Array.isArray(arr)) return;
+    out.push(arr);
+    arr.forEach(n => {
+      walk(n.children); walk(n.refChildren);
+      if (n.branches) Object.keys(n.branches).forEach(k => walk(n.branches[k]));
+    });
+  };
+  if (g.sections) g.sections.forEach(sec => walk(sec.nodes));
+  else { walk(g.func); walk(g.nonfunc); walk(g.modOnly); }
+  return out;
+}
+function sameId(g, id, fn) { nodeArrays(g).forEach(arr => arr.forEach(n => { if (n.id === id) fn(n); })); }
+function removeId(g, id) {
+  nodeArrays(g).forEach(arr => { for (let i = arr.length - 1; i >= 0; i--) if (arr[i].id === id) arr.splice(i, 1); });
+}
+const hasKids = n => !!((n.children && n.children.length) ||
+  (n.branches && Object.keys(n.branches).some(k => n.branches[k].length)));
+function changed() { saveTpl(); refresh(); }
+
+/* 1行の編集欄。値を変えるたびに保存し、プレビューを更新する */
+function edField(label, value, onInput, ph) {
+  const w = el("div", "node");
+  const id = "ed_" + Math.random().toString(36).slice(2);
+  const lab = el("label", null, label); lab.htmlFor = id;
+  const ta = el("textarea"); ta.id = id; ta.rows = 1; ta.value = value || "";
+  if (ph) ta.placeholder = ph;
+  ta.addEventListener("input", () => { onInput(ta.value); grow(ta); changed(); });
+  w.append(lab, ta);
+  return w;
+}
+function edList(g, arr, label) {
+  const box = el("div", "ed-list");
+  if (label) box.append(el("div", "branch", label));
+  arr.forEach((n, i) => box.append(edNode(g, arr, i)));
+  const links = el("div", "links");
+  [["text", "＋ 自由記述の問い"], ["list", "＋ 項目の一覧の問い"], ["choice", "＋ 選択式の問い"]].forEach(([type, text]) => {
+    const b = el("button", "etc-btn", text); b.type = "button";
+    b.addEventListener("click", () => {
+      const n = { id: "u_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+                  q: "新しい問い", label: "新しい項目", type };
+      if (type === "choice") n.options = ["はい", "いいえ"];
+      arr.push(n); changed(); renderForm();
+      const t = document.querySelector("[data-ed='" + n.id + "'] textarea"); if (t) { t.focus(); t.select(); }
+    });
+    links.append(b);
+  });
+  box.append(links);
+  return box;
+}
+function edNode(g, arr, i) {
+  const n = arr[i];
+  const wrap = el("div", "step ed-node");
+  wrap.dataset.ed = n.id;
+  const head = el("div", "step-head");
+  head.append(el("span", "badge", TYPE_NAMES[n.type] || n.type), el("span", "spacer"));
+  const btn = (text, aria, fn, disabled) => {
+    const b = el("button", "del", text); b.type = "button"; b.setAttribute("aria-label", aria);
+    b.disabled = !!disabled; b.addEventListener("click", fn); head.append(b);
+  };
+  btn("↑", "上へ移動", () => { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; changed(); renderForm(); }, i === 0);
+  btn("↓", "下へ移動", () => { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; changed(); renderForm(); }, i === arr.length - 1);
+  btn("×", "この問いを削除", () => {
+    if (!confirm("「" + n.q + "」" + (hasKids(n) ? "と、その下の問い" : "") + "を削除する。")) return;
+    removeId(g, n.id); changed(); renderForm();
+  });
+  wrap.append(head);
+  wrap.append(edField("問い", n.q, val => sameId(g, n.id, x => { x.q = val; })));
+  wrap.append(edField("本文での表記", n.label, val => sameId(g, n.id, x => { x.label = val; })));
+  /* 選択肢は、選択肢ごとの続きの問いを持たない場合だけ編集できる */
+  if ((n.type === "choice" || n.type === "multi") && !n.branches) {
+    wrap.append(edField("選択肢(1行に1つ)", (n.options || []).join("\n"), val => sameId(g, n.id, x => {
+      x.options = val.split("\n").map(s => s.trim()).filter(Boolean);
+    })));
+  }
+  if (!n.always) {
+    const lab = el("label", "ed-check");
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = !!n.optional;
+    cb.addEventListener("change", () => { sameId(g, n.id, x => { if (cb.checked) x.optional = true; else delete x.optional; }); changed(); });
+    lab.append(cb, document.createTextNode(" 任意(空なら本文に出さない)"));
+    wrap.append(lab);
+  }
+  const kids = el("div", "kids");
+  if (n.children) kids.append(edList(g, n.children, "下の問い"));
+  if (n.branches) Object.keys(n.branches).forEach(k => kids.append(edList(g, n.branches[k], "「" + k + "」の場合")));
+  if (kids.childNodes.length) wrap.append(kids);
+  return wrap;
+}
+function renderEditor() {
+  const g = GENRES[state.genre];
+  const form = $("form");
+  form.textContent = "";
+  const h = headsOf(g);
+  const setHead = key => val => { g.heads = Object.assign({}, g.heads, { [key]: val }); };
+  const top = el("section", "card");
+  top.append(el("h2", null, g.name + "のテンプレート"));
+  top.append(el("p", "note ed-note", "ここでの変更は、このブラウザ内にだけ保存される。入力済みの内容は消えない。"));
+  const reset = el("button", "plain", "このジャンルを初期状態に戻す"); reset.type = "button";
+  reset.addEventListener("click", () => {
+    if (!confirm(g.name + "のテンプレートを初期状態に戻す。編集した内容は元に戻せない。")) return;
+    GENRES[state.genre] = clone(DEFAULT_GENRES[state.genre]); changed(); renderForm();
+  });
+  top.append(reset);
+  const heads = el("section", "card");
+  heads.append(el("h2", null, "本文の構成"));
+  if (g.sections) {
+    heads.append(edField("見出し: 概要", g.storyLabel, val => { g.storyLabel = val; }));
+    g.sections.forEach(sec => {
+      heads.append(edField("見出し: " + defaultTitle(sec), sec.title, val => { sec.title = val; }));
+      if (sec.lead != null) heads.append(edField("「" + sec.title + "」の1行目(定型文)", sec.lead, val => { sec.lead = val; }));
+    });
+  } else {
+    [["story", "ストーリー"], ["ac", "受け入れ条件"], ["func", "機能要件"], ["nonfunc", "非機能要件"], ["other", "その他"]]
+      .forEach(([k, l]) => heads.append(edField("見出し: " + l, h[k], setHead(k))));
+    heads.append(edField("受け入れ条件の1行目(新規作成)", h.leadNew, setHead("leadNew")));
+    heads.append(edField("受け入れ条件の1行目(既存改修)", h.leadMod, setHead("leadMod")));
+    heads.append(el("p", "note ed-note", "{名前} は、名前欄の値と「" + g.noun + "」に置き換わる。"));
+  }
+  [["deps", "依存関係・環境"], ["refs", "参考情報"]].forEach(([k, l]) => heads.append(edField("見出し: " + l, h[k], setHead(k))));
+  form.append(top, heads);
+  const listCard = (title, arr) => {
+    const c = el("section", "card");
+    c.append(el("h2", null, title), edList(g, arr));
+    form.append(c);
+  };
+  if (g.sections) g.sections.forEach(sec => listCard("問い: " + sec.title, sec.nodes));
+  else {
+    listCard("問い: " + h.func, g.func);
+    listCard("問い: " + h.nonfunc, g.nonfunc);
+    listCard("問い: " + h.other + "(既存改修のときだけ)", g.modOnly);
+  }
+  form.querySelectorAll(".kids").forEach(k => {
+    let d = 1;
+    for (let p = k.parentElement; p && p !== form; p = p.parentElement) if (p.classList.contains("kids")) d++;
+    k.style.setProperty("--lv", LEVELS[d % LEVELS.length]);
+  });
+  form.querySelectorAll("textarea").forEach(grow);
+}
+/* 節の初期の見出し(編集欄のラベルに使う) */
+function defaultTitle(sec) {
+  const d = (DEFAULT_GENRES[state.genre].sections || []).find(x => x.key === sec.key);
+  return d ? d.title : sec.key;
 }
 
 function renderGenres() {
@@ -1226,6 +1411,11 @@ function renderGenres() {
     b.addEventListener("click", () => { useGenre(key); openEtc.clear(); renderGenres(); renderForm(); refresh(); });
     box.append(b);
   });
+  box.append(el("span", "spacer"));
+  const ed = el("button", editing ? "primary" : "plain", editing ? "編集を終えて入力に戻る" : "テンプレートを編集");
+  ed.type = "button"; ed.id = "editTpl";
+  ed.addEventListener("click", () => { editing = !editing; renderGenres(); renderForm(); refresh(); window.scrollTo(0, 0); });
+  box.append(ed);
 }
 
 function refresh() {
