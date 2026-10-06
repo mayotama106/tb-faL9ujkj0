@@ -137,6 +137,13 @@
   .note-field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
   .spacer { flex: 1 1 auto; }
   .note { margin: 12px 0 0; font-size: 13px; color: #4a5672; }
+  .saved { margin-top: 20px; }
+  .saved ul { list-style: none; margin: 0; padding: 0; }
+  .saved li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--mist); }
+  .saved li:first-child { border-top: 0; }
+  .saved .t { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+  .saved .meta { font-size: 13px; color: #4a5672; }
+  .saved .empty { color: #4a5672; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -149,21 +156,23 @@
       <div class="bar">
         <h2>チケット本文</h2>
         <span class="count" id="count"></span>
-        <div class="chips" role="group" aria-label="出力形式">
-          <button type="button" class="chip" data-fmt="wiki">Jira記法</button>
-          <button type="button" class="chip" data-fmt="md">Markdown</button>
-        </div>
       </div>
       <pre id="out"></pre>
       <div class="actions">
         <button type="button" class="primary" id="copyBody">本文をコピー</button>
         <button type="button" class="plain" id="copyTitle">タイトルをコピー</button>
+        <button type="button" class="plain" id="saveLocal">ブラウザに保存</button>
+        <button type="button" class="plain" id="saveMd">Markdownで書き出す</button>
         <span class="spacer"></span>
         <button type="button" class="plain" id="reset">このジャンルの入力を消去</button>
       </div>
-      <p class="note">入力内容はこのブラウザ内にだけ保存され、外部には送信されない。</p>
+      <p class="note">入力内容と保存したチケットはこのブラウザ内にだけ保存され、外部には送信されない。</p>
     </section>
   </div>
+  <section class="card saved" aria-label="保存したチケット">
+    <h2>保存したチケット</h2>
+    <ul id="savedList"></ul>
+  </section>
 </main>
 
 <script>
@@ -363,22 +372,20 @@ function valueOf(node, v) {
   return (raw || "").trim();
 }
 
-/* state = { genre, fmt, v: { id: 値 } } からチケット本文を作る */
+/* state = { genre, v: { id: 値 } } から、Markdownのチケット本文を作る */
 function buildTicket(state) {
   const g = GENRES[state.genre];
-  const wiki = state.fmt !== "md";
   const v = state.v || {};
   const sparseAll = v.mod === MOD;   /* 既存改修は、記載のある項目だけを出力する */
   let missing = 0;
 
-  const esc = s => wiki ? s.replace(/[{}\[\]]/g, "\\$&") : s;
-  const H = (lv, s) => (wiki ? "h" + lv + ". " : "#".repeat(lv) + " ") + s;
+  const esc = s => s;
+  const H = (lv, s) => "#".repeat(lv) + " " + s;
   /* d は深さ(数値)、または "b"(箇条書き)と "n"(番号付き)の並び */
   const typesOf = d => Array.isArray(d) ? d : Array(d).fill("b");
   const deeper = (d, t) => typesOf(d).concat(t || "b");
   const B = (d, s) => {
     const ts = typesOf(d);
-    if (wiki) return ts.map(t => t === "n" ? "#" : "*").join("") + " " + s;
     const indent = ts.slice(0, -1).reduce((n, t) => n + (t === "n" ? 3 : 2), 0);
     return " ".repeat(indent) + (ts[ts.length - 1] === "n" ? "1. " : "- ") + s;
   };
@@ -657,12 +664,13 @@ function buildTicket(state) {
 <script>
 /* ===== 画面 ===== */
 const KEY = "ticket-builder:v1";
-let state = { genre: "api", fmt: "wiki", all: {}, c: [] };
+let state = { genre: "api", all: {}, c: [] };
 try {
   const saved = JSON.parse(localStorage.getItem(KEY) || "null");
   if (saved) {
     if (!saved.all && saved.v) saved.all = { api: saved.v };   /* 旧形式の入力をAPI作成へ引き継ぐ */
     delete saved.v;
+    delete saved.fmt;   /* 出力形式はMarkdownだけになった */
     state = Object.assign(state, saved);
   }
 } catch (e) { /* 保存領域が使えない環境では保存なしで動く */ }
@@ -688,7 +696,7 @@ const el = (tag, cls, text) => {
 };
 function save() {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ genre: state.genre, fmt: state.fmt, all: state.all, c: state.c }));
+    localStorage.setItem(KEY, JSON.stringify({ genre: state.genre, all: state.all, c: state.c }));
   } catch (e) {}
 }
 function grow(t) { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
@@ -1218,8 +1226,6 @@ function refresh() {
   const c = $("count");
   c.textContent = r.missing ? "未記入 " + r.missing + " 件" : "未記入なし";
   c.classList.toggle("done", !r.missing);
-  document.querySelectorAll("[data-fmt]").forEach(b =>
-    b.setAttribute("aria-pressed", b.dataset.fmt === state.fmt ? "true" : "false"));
   save();
 }
 
@@ -1238,16 +1244,82 @@ async function copy(text, btn, done) {
   setTimeout(() => { btn.textContent = orig; }, 1800);
 }
 
-document.querySelectorAll("[data-fmt]").forEach(b =>
-  b.addEventListener("click", () => { state.fmt = b.dataset.fmt; refresh(); }));
 $("copyBody").addEventListener("click", e => copy(buildTicket(state).text, e.currentTarget, "本文をコピーした"));
 $("copyTitle").addEventListener("click", e => copy((state.v.title || "").trim(), e.currentTarget, "タイトルをコピーした"));
+/* ===== 保存したチケット =====
+   ブラウザ内(localStorage)に、1件ずつ { id, genre, title, at, v } で持つ。
+   入力中のチケットは、保存元の id を v._sid に持ち、再保存で上書きする */
+const SAVED_KEY = "ticket-builder:saved:v1";
+function loadSaved() {
+  try { const a = JSON.parse(localStorage.getItem(SAVED_KEY) || "[]"); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function storeSaved(a) {
+  try { localStorage.setItem(SAVED_KEY, JSON.stringify(a)); return true; } catch (e) { return false; }
+}
+const pad = n => String(n).padStart(2, "0");
+const stamp = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+function flash(btn, text) {
+  const orig = btn.dataset.label || btn.textContent;
+  btn.dataset.label = orig; btn.textContent = text;
+  setTimeout(() => { btn.textContent = orig; }, 1800);
+}
+function renderSaved() {
+  const ul = $("savedList");
+  ul.textContent = "";
+  const items = loadSaved();
+  if (!items.length) { ul.append(el("li", "empty", "まだない。「ブラウザに保存」で、ここに残る。")); return; }
+  items.forEach(it => {
+    const li = el("li");
+    const t = el("span", "t", it.title || "(タイトルなし)");
+    const meta = el("span", "meta", (GENRES[it.genre] ? GENRES[it.genre].name : it.genre) + " / " + it.at);
+    const open = el("button", "plain", "開く"); open.type = "button";
+    const md = el("button", "plain", "Markdownで書き出す"); md.type = "button";
+    const del = el("button", "plain", "削除"); del.type = "button";
+    open.addEventListener("click", () => {
+      if (!GENRES[it.genre]) return;
+      if (!confirm("「" + (it.title || "(タイトルなし)") + "」を開く。" + GENRES[it.genre].name + "の入力中の内容は置き換わる。")) return;
+      state.all[it.genre] = JSON.parse(JSON.stringify(it.v));
+      useGenre(it.genre); openEtc.clear(); renderGenres(); renderForm(); refresh();
+      window.scrollTo(0, 0);
+    });
+    md.addEventListener("click", () => downloadMd(it.genre, it.v));
+    del.addEventListener("click", () => {
+      if (!confirm("「" + (it.title || "(タイトルなし)") + "」を削除する。元に戻せない。")) return;
+      storeSaved(loadSaved().filter(x => x.id !== it.id)); renderSaved();
+    });
+    li.append(t, meta, open, md, del);
+    ul.append(li);
+  });
+}
+/* タイトルを見出しにし、本文を続けたMarkdownファイルを保存させる */
+function downloadMd(genre, v) {
+  const title = (v.title || "").trim();
+  const body = buildTicket({ genre, v }).text;
+  const text = "# " + (title || "(タイトルなし)") + "\n\n" + body + "\n";
+  const name = (title || GENRES[genre].name).replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 80) + ".md";
+  const a = el("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown;charset=utf-8" }));
+  a.download = name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$("saveLocal").addEventListener("click", e => {
+  const items = loadSaved();
+  if (!state.v._sid || !items.some(x => x.id === state.v._sid)) state.v._sid = Date.now().toString(36);
+  const it = { id: state.v._sid, genre: state.genre, title: (state.v.title || "").trim(), at: stamp(new Date()),
+               v: JSON.parse(JSON.stringify(state.v)) };
+  const rest = items.filter(x => x.id !== it.id);
+  if (storeSaved([it].concat(rest))) { save(); renderSaved(); flash(e.currentTarget, "保存した"); }
+  else flash(e.currentTarget, "保存できなかった");
+});
+$("saveMd").addEventListener("click", () => downloadMd(state.genre, state.v));
 $("reset").addEventListener("click", () => {
   if (!confirm(GENRES[state.genre].name + "の入力をすべて消去する。元に戻せない。")) return;
   state.all[state.genre] = {}; useGenre(state.genre); openEtc.clear(); renderForm(); refresh();
 });
 
-renderGenres(); renderForm(); refresh();
+renderGenres(); renderForm(); refresh(); renderSaved();
 </script>
 </body>
 </html>
