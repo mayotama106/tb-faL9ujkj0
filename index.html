@@ -311,7 +311,7 @@ const GENRES = {
   },
   /* 不具合の報告と修正。作成区分を持たず、節の構成が他のジャンルと異なる */
   bug: {
-    name: "エラーチケット",
+    name: "バグチケット",
     storyLabel: "概要",
     storyHint: "どんな不具合か(一言で)",
     sections: [
@@ -607,7 +607,7 @@ function buildTicket(state) {
     return { title, body };
   }
 
-  /* 節の構成を自前で持つジャンル(エラーチケット) */
+  /* 節の構成を自前で持つジャンル(バグチケット) */
   if (g.sections) {
     const o = [H(3, g.storyLabel || "ストーリー"), ...free("story")];
     g.sections.forEach(sec => {
