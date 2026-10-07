@@ -55,8 +55,8 @@ function randomValues(genre: string, r: () => number): Values {
 }
 
 describe("buildTicket は旧版と同じ本文を出す", () => {
-  /* 処理の流れの形式(ロジック作成)は旧版と形式が異なるので、flow.test.ts で確かめる */
-  for (const genre of Object.keys(GENRES).filter(k => !GENRES[k].flow)) {
+  /* 実装チケットは旧版と形式が異なるので、impl.test.ts で確かめる */
+  for (const genre of Object.keys(GENRES).filter(k => !GENRES[k].impl)) {
     it(genre, () => {
       const r = rng(genre.length * 7919);
       expect(buildTicket(GENRES[genre], {}).text).toBe(legacy({ genre, v: {} }).text);

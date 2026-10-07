@@ -3,21 +3,22 @@ import { useMemo, useState } from "react";
 import { GENRES } from "../domain/genres";
 import { buildTicket } from "../domain/ticket";
 import { createDoc, deleteDoc, duplicateDoc, openDoc } from "../state/actions";
-import { genreOf, setUI, useStore } from "../state/store";
+import { defsOf, genreOf, setUI, useStore } from "../state/store";
 import { downloadMd, stamp, titleOf } from "../utils";
 
 export function Sidebar() {
   const docs = useStore(s => s.data.docs);
   const templates = useStore(s => s.data.templates);
+  const defs = useStore(s => defsOf(s.data));
   const currentId = useStore(s => s.ui.currentId);
   const query = useStore(s => s.ui.query);
   const filter = useStore(s => s.ui.filter);
   const [picking, setPicking] = useState(false);
 
   const rows = useMemo(() => docs.map(d => {
-    const g = genreOf({ docs, templates }, d.genre);
-    return { d, g, title: titleOf(d.v), missing: buildTicket(g, d.v).missing };
-  }), [docs, templates]);
+    const g = genreOf({ docs, templates, comps: {} }, d.genre);
+    return { d, g, title: titleOf(d.v), missing: buildTicket(g, d.v, defs).missing };
+  }), [docs, templates, defs]);
   const q = query.trim().toLowerCase();
   const shown = rows
     .filter(r => !filter || r.d.genre === filter)
@@ -59,7 +60,7 @@ export function Sidebar() {
             </button>
             <div className="ops">
               <button type="button" className="icon" title="複製して新しく作る" aria-label="複製" onClick={() => duplicateDoc(d.id)}>⧉</button>
-              <button type="button" className="icon" title="Markdownで書き出す" aria-label="Markdownで書き出す" onClick={() => downloadMd(g, d.v)}>⤓</button>
+              <button type="button" className="icon" title="Markdownで書き出す" aria-label="Markdownで書き出す" onClick={() => downloadMd(g, d.v, defs)}>⤓</button>
               <button type="button" className="icon" title="削除" aria-label="削除" onClick={() => deleteDoc(d.id)}>×</button>
             </div>
           </li>

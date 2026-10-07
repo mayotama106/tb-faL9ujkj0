@@ -1,3 +1,4 @@
+import type { CompDef } from "./domain/components";
 import type { Genre } from "./domain/genres";
 import { buildTicket, type Values } from "./domain/ticket";
 
@@ -17,9 +18,9 @@ export async function copyText(text: string): Promise<boolean> {
 export const titleOf = (v: Values) => (v.title || "").trim().replace(/\s*\n\s*/g, " ");
 
 /* タイトルを見出しにし、本文を続けたMarkdownファイルを保存させる */
-export function downloadMd(g: Genre, v: Values) {
+export function downloadMd(g: Genre, v: Values, defs?: Record<string, CompDef>) {
   const title = titleOf(v);
-  const text = "# " + (title || "(タイトルなし)") + "\n\n" + buildTicket(g, v).text + "\n";
+  const text = "# " + (title || "(タイトルなし)") + "\n\n" + buildTicket(g, v, defs).text + "\n";
   const name = (title || g.name).replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 80) + ".md";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown;charset=utf-8" }));

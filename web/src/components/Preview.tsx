@@ -3,12 +3,14 @@ import { useEffect, useRef } from "react";
 import type { Genre } from "../domain/genres";
 import type { Ticket, Values } from "../domain/ticket";
 import { downloadMd, titleOf } from "../utils";
+import { defsOf, useStore } from "../state/store";
 import { CopyButton } from "./Wizard";
 
 export function Preview({ g, v, ticket, partKey, onGo }: {
   g: Genre; v: Values; ticket: Ticket; partKey?: string; onGo?: (key: string) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
+  const defs = useStore(s => defsOf(s.data));
   useEffect(() => {
     const b = box.current; if (!b) return;
     const cur = b.querySelector<HTMLElement>(".blk.cur");
@@ -32,7 +34,7 @@ export function Preview({ g, v, ticket, partKey, onGo }: {
       <div className="actions">
         <CopyButton className="primary" text={() => ticket.text} done="本文をコピーした">本文をコピー</CopyButton>
         <CopyButton className="plain" text={() => titleOf(v)} done="タイトルをコピーした">タイトルをコピー</CopyButton>
-        <button type="button" className="plain" onClick={() => downloadMd(g, v)}>Markdownで書き出す</button>
+        <button type="button" className="plain" onClick={() => downloadMd(g, v, defs)}>Markdownで書き出す</button>
       </div>
       <p className="note">入力はこのブラウザ内に自動保存され、外部には送信されない。</p>
     </section>

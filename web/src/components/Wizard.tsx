@@ -4,10 +4,10 @@ import { MOD, NEW, type Genre } from "../domain/genres";
 import { headsOf, type Ticket } from "../domain/ticket";
 import { clearDoc, duplicateDoc, goPart } from "../state/actions";
 import { FINAL, partsOf, type Part } from "../state/parts";
-import type { Doc } from "../state/store";
+import { defsOf, useStore, type Doc } from "../state/store";
 import { copyText, downloadMd, titleOf } from "../utils";
 import { Chips, EtcField, Field } from "./Fields";
-import { FlowPart } from "./FlowParts";
+import { ImplPart } from "./ImplParts";
 import { NodeView } from "./NodeView";
 
 export function Wizard({ doc, g, ticket, partKey }: { doc: Doc; g: Genre; ticket: Ticket; partKey: string }) {
@@ -50,7 +50,7 @@ function PartBody({ doc, g, part, parts, ticket, missingOf }: {
   const isMod = v.mod === MOD;
   const nodes = (list: Genre["func"]) => (list || []).map(n => <NodeView key={n.id} node={n} g={g} />);
   const modNote = isMod && <p className="hint">既存改修: 変更点だけ記入する。記入のない項目は本文に出ない。</p>;
-  if (g.flow && part.key !== FINAL) return <FlowPart g={g} partKey={part.key} />;
+  if (g.impl && part.key !== FINAL) return <ImplPart g={g} partKey={part.key} />;
   switch (part.key) {
     case "basic": return <>
       <Field path={["title"]} label="タイトル(Jiraの要約欄に入れる)" />
@@ -84,6 +84,7 @@ function PartBody({ doc, g, part, parts, ticket, missingOf }: {
 
 /* 仕上げ: パートごとの未記入の確認と、書き出し */
 function Final({ doc, g, parts, ticket, missingOf }: { doc: Doc; g: Genre; parts: Part[]; ticket: Ticket; missingOf: (k: string) => number }) {
+  const defs = useStore(s => defsOf(s.data));
   return <>
     <p className="hint">{ticket.missing ? "未記入が " + ticket.missing + " 件ある。埋めるパートを選ぶ。" : "未記入はない。本文をコピーしてJiraに貼る。"}</p>
     <ul className="review">
@@ -101,7 +102,7 @@ function Final({ doc, g, parts, ticket, missingOf }: { doc: Doc; g: Genre; parts
     <div className="actions">
       <CopyButton className="primary" text={() => ticket.text} done="本文をコピーした">本文をコピー</CopyButton>
       <CopyButton className="plain" text={() => titleOf(doc.v)} done="タイトルをコピーした">タイトルをコピー</CopyButton>
-      <button type="button" className="plain" onClick={() => downloadMd(g, doc.v)}>Markdownで書き出す</button>
+      <button type="button" className="plain" onClick={() => downloadMd(g, doc.v, defs)}>Markdownで書き出す</button>
       <span className="spacer" />
       <button type="button" className="plain" onClick={() => duplicateDoc(doc.id)}>複製して新しく作る</button>
       <button type="button" className="plain" onClick={() => clearDoc(doc.id)}>入力を消去</button>

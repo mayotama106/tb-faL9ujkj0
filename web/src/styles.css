@@ -277,3 +277,36 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
 .ac-case { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 0 0 12px; border-top: 1px dashed rgba(161, 178, 214, 0.6); margin-top: 6px; }
 .ac-case .lbl { flex: 1 1 220px; font-size: 14px; }
 .ac-ok { margin-top: 16px; }
+
+/* ===== 部品(実装チケット) ===== */
+.palette { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; padding: 8px 10px; border: 1px dashed var(--mist); border-radius: 10px; background: rgba(251, 250, 247, 0.5); }
+.pal-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.pal-row .etc-btn { margin-top: 4px; }
+.pal-g { font-size: 12px; font-weight: 700; color: var(--muted); min-width: 5.5em; margin-top: 4px; }
+.etc-btn.pal-box { --lv: #8A6234; }
+.etc-btn.pal-data { --lv: #1E3A8A; }
+.etc-btn.pal-proc { --lv: #51607F; }
+.badge.b-box { background: #8A6234; }
+.badge.b-data { background: var(--blue); }
+.badge.b-proc { background: #51607F; }
+.badge.b-row { background: #7A705F; }
+.step.comp { background: var(--field); border: 1px solid var(--mist); border-radius: 10px; padding: 8px 10px; }
+.step.comp-box { border-color: #c9ab86; border-width: 1.5px; }
+.step.comp .step.comp { background: #fff; }
+.row-card { background: rgba(244, 242, 236, 0.7); border: 1px solid var(--mist); border-radius: 10px; padding: 8px 10px; margin-top: 8px; }
+.row-card > .node:first-of-type { margin-top: 8px; }
+.err-ed { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.err-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.err-row .lbl { font-size: 13px; font-weight: 600; }
+.code-wrap { display: inline-flex; align-items: center; gap: 4px; }
+.code-wrap.wide { flex: 1 1 260px; }
+.code-wrap.wide input.code { width: 100%; }
+.code-wrap input.code { width: 9.5em; padding: 5px 8px; font-family: ui-monospace, Consolas, monospace; }
+.code-wrap input.code.empty:not(:disabled) { border-color: var(--gold); background: #fff8ef; }
+.code-wrap input.code:disabled { background: transparent; border-style: dashed; }
+.chip.mini { padding: 1px 8px; font-size: 12px; }
+.ac-case { flex-direction: column; align-items: stretch; }
+.ac-case .lbl { flex: none; font-weight: 600; }
+.tpl-tabs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.tpl-tabs .genres { margin-bottom: 4px; }
+.tpl-tabs .chip { padding: 3px 12px; font-size: 13px; }

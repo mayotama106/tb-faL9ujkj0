@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { GENRES } from "./domain/genres";
 import { buildTicket } from "./domain/ticket";
 import { createDoc, goPart } from "./state/actions";
-import { currentDoc, genreOf, redo, setUI, undo, useStore } from "./state/store";
+import { currentDoc, defsOf, genreOf, redo, setUI, undo, useStore } from "./state/store";
 import { Preview } from "./components/Preview";
 import { Sidebar } from "./components/Sidebar";
 import { TemplateEditor } from "./components/TemplateEditor";
@@ -33,10 +33,12 @@ export function App() {
   }, []);
 
   /* プレビューに出すチケット。テンプレートの編集中は、編集中のジャンルで作る */
-  const previewGenre = editing ? editGenre : doc ? doc.genre : null;
+  /* 部品の編集中(comp:種類)は、実装チケットで作る */
+  const previewGenre = editing ? (editGenre.startsWith("comp:") ? "impl" : editGenre) : doc ? doc.genre : null;
   const g = previewGenre ? genreOf(data, previewGenre) : null;
   const v = doc && doc.genre === previewGenre ? doc.v : EMPTY;
-  const ticket = useMemo(() => (g ? buildTicket(g, v) : null), [g, v]);
+  const defs = defsOf(data);
+  const ticket = useMemo(() => (g ? buildTicket(g, v, defs) : null), [g, v, defs]);
 
   return <>
     <header className="top">

@@ -1,6 +1,7 @@
 /* チケット本文(Markdown)の生成。画面に依存しない。
    旧版 index.html の buildTicket を移したもの。本文はパートごとのブロックに分けて返す */
-import { buildFlowTicket } from "./flow";
+import type { CompDef } from "./components";
+import { buildImplTicket } from "./impl";
 import { HAS, HAS_NOT, LOGIC_SRC, MISSING, MOD, NEW, REF, type Genre, type Heads, type QNode } from "./genres";
 
 /* 入力値。キーは問いのID(と、その派生) */
@@ -44,8 +45,9 @@ export interface Ticket { text: string; missing: number; blocks: Block[] }
 
 type Depth = number | string[];
 
-export function buildTicket(g: Genre, v: Values = {}): Ticket {
-  if (g.flow) return buildFlowTicket(g, v);
+/* defs は実装チケットの部品の定義(テンプレートの編集を反映したもの)。省略すると初期の定義 */
+export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, CompDef>): Ticket {
+  if (g.impl) return buildImplTicket(g, v, defs);
   const h = headsOf(g);
   const sparseAll = v.mod === MOD;   /* 既存改修は、記載のある項目だけを出力する */
   let missing = 0;

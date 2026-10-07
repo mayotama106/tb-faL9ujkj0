@@ -3,6 +3,7 @@
    ui(開いているチケット、表示中のパートなど)は取り消しの対象外 */
 import { produce, type Draft } from "immer";
 import { useSyncExternalStore } from "react";
+import { COMPONENTS, type CompDef } from "../domain/components";
 import { GENRES, type Genre } from "../domain/genres";
 import type { Values } from "../domain/ticket";
 import { loadInitial, persist } from "./persist";
@@ -11,6 +12,7 @@ export interface Doc { id: string; genre: string; v: Values; createdAt: number; 
 export interface Data {
   docs: Doc[];
   templates: Record<string, Genre>;   /* 編集したテンプレート。初期状態と同じジャンルは持たない */
+  comps: Record<string, CompDef>;     /* 編集した部品の定義。初期の定義と同じ部品は持たない */
 }
 export interface Toast { id: number; text: string; undo: boolean }
 export interface UI {
@@ -32,7 +34,7 @@ let state: State = {
   data: init.data,
   ui: {
     currentId: init.currentId, part: {}, collapsed: init.collapsed, openEtc: [], editing: false,
-    editGenre: "api", query: "", filter: "", sidebar: false, toast: null
+    editGenre: "impl", query: "", filter: "", sidebar: false, toast: null
   },
   past: [], future: []
 };
@@ -105,6 +107,12 @@ export function toast(text: string, undoable = false) {
 /* ===== 便利な関数 ===== */
 export const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 export const genreOf = (data: Data, key: string): Genre => data.templates[key] || GENRES[key];
+/* 部品の定義(編集を反映したもの)。同じ data なら同じオブジェクトを返す */
+let defsCache: { comps: Data["comps"]; defs: Record<string, CompDef> } | null = null;
+export const defsOf = (data: Data): Record<string, CompDef> => {
+  if (!defsCache || defsCache.comps !== data.comps) defsCache = { comps: data.comps, defs: { ...COMPONENTS, ...data.comps } };
+  return defsCache.defs;
+};
 export const currentDoc = (s: State): Doc | null => s.data.docs.find(d => d.id === s.ui.currentId) || null;
 
 type Path = (string | number)[];
