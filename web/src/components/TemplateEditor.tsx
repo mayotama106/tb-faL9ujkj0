@@ -75,7 +75,13 @@ export function TemplateEditor() {
       </section>
       <section className="card">
         <h2>本文の構成</h2>
-        {g.sections ? <>
+        {g.flow ? <>
+          {([["story", "ストーリー"], ["flowSuffix", "処理の見出しの末尾(〇〇処理)"], ["flowTitle", "処理の流れ"], ["ac", "受け入れ条件"],
+            ["okCase", "受け入れ条件の正常時の書き方"], ["notes", "制約事項・技術的補足"], ["branch", "ブランチ"],
+            ["call", "呼び出し条件"], ["nonfunc", "非機能要件"], ["impact", "既存影響"]] as const)
+            .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
+          <p className="hint">ロジック作成は、問いの代わりに処理の流れの工程で組み立てる形式のため、問いの編集はない。</p>
+        </> : g.sections ? <>
           <EdField label="見出し: 概要" value={g.storyLabel || ""} onChange={val => editTpl(genre, t => { t.storyLabel = val; }, "storyLabel")} />
           {g.sections.map((sec, i) => <div key={sec.key}>
             <EdField label={"見出し: " + ((GENRES[genre].sections || []).find(x => x.key === sec.key)?.title || sec.key)} value={sec.title}
@@ -90,10 +96,10 @@ export function TemplateEditor() {
           <EdField label="受け入れ条件の1行目(既存改修)" value={h.leadMod} onChange={setHead("leadMod")} />
           <p className="hint">{"{名前}"} は、名前欄の値と「{g.noun}」に置き換わる。</p>
         </>}
-        {([["deps", "依存関係・環境"], ["refs", "参考情報"]] as const)
+        {(g.flow ? [["deps", "依存関係"]] as const : [["deps", "依存関係・環境"], ["refs", "参考情報"]] as const)
           .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
       </section>
-      {g.sections ? g.sections.map((sec, i) => (
+      {g.flow ? null : g.sections ? g.sections.map((sec, i) => (
         <section className="card" key={sec.key}><h2>問い: {sec.title}</h2><EdList genre={genre} path={["sections", i, "nodes"]} /></section>
       )) : <>
         <section className="card"><h2>問い: {h.func}</h2><EdList genre={genre} path={["func"]} /></section>

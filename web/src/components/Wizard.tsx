@@ -7,6 +7,7 @@ import { FINAL, partsOf, type Part } from "../state/parts";
 import type { Doc } from "../state/store";
 import { copyText, downloadMd, titleOf } from "../utils";
 import { Chips, EtcField, Field } from "./Fields";
+import { FlowPart } from "./FlowParts";
 import { NodeView } from "./NodeView";
 
 export function Wizard({ doc, g, ticket, partKey }: { doc: Doc; g: Genre; ticket: Ticket; partKey: string }) {
@@ -49,6 +50,7 @@ function PartBody({ doc, g, part, parts, ticket, missingOf }: {
   const isMod = v.mod === MOD;
   const nodes = (list: Genre["func"]) => (list || []).map(n => <NodeView key={n.id} node={n} g={g} />);
   const modNote = isMod && <p className="hint">既存改修: 変更点だけ記入する。記入のない項目は本文に出ない。</p>;
+  if (g.flow && part.key !== FINAL) return <FlowPart g={g} partKey={part.key} />;
   switch (part.key) {
     case "basic": return <>
       <Field path={["title"]} label="タイトル(Jiraの要約欄に入れる)" />

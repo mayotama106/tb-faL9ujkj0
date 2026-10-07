@@ -70,13 +70,43 @@ function migrateV1(): Stored {
   return { docs, currentId: currentId || (docs[0] ? docs[0].id : null), collapsed: (v1 && v1.c) || [] };
 }
 
+/* 旧形式(観点表)のロジック作成の入力を、処理の流れの形式に移す。元の値も残す */
+export function migrateFlow(v: Values): Values {
+  if (v._flow) return v;
+  const n: Values = { ...v, _flow: 1 };
+  const str = (x: unknown) => (typeof x === "string" ? x.trim() : "");
+  const lines = (x: unknown) => (Array.isArray(x) ? x : String(x || "").split("\n")).map(s => String(s).trim()).filter(Boolean);
+  if (str(v.story) && !n.story_goal) n.story_goal = v.story;
+  if (str(v.trigger) && !n.call) n.call = v.trigger;
+  if (str(v.mod_impact) && !n.impact) n.impact = v.mod_impact;
+  const nf = [["呼び出し頻度", v.nf_freq], ["タイムアウト時間", v.nf_timeout], ["データ量の上限", v.nf_volume]]
+    .filter(([, x]) => str(x)).map(([l, x]) => l + ": " + str(x));
+  if (nf.length && !n.nonfunc) n.nonfunc = nf.join("\n");
+  if (typeof v.deps === "string") n.deps = lines(v.deps);
+  if (str(v.refs) && !n.story_refs) n.story_refs = lines(v.refs);
+  /* 旧形式の工程: 処理実行(子の工程は詳細へ)、条件分岐、エラーハンドリング(エラー返却へ) */
+  const conv = (arr: unknown): Values[] => (Array.isArray(arr) ? arr : []).map((s: Values) => {
+    if (s.kind === "if") return { _k: s._k, kind: "if", text: s.text || "", ac: "", yes: "", no: "", then: conv(s.then), else: conv(s.else) };
+    if (s.kind === "err") return { _k: s._k, kind: "error", status: "", code: str(s.eid),
+      detail: [s.ek, s.emsg, s.note].map(str).filter(Boolean).join("\n") };
+    const kids = (Array.isArray(s.kids) ? s.kids : []).map((k: Values) => str(k.text)).filter(Boolean);
+    return { _k: s._k, kind: "do", text: s.text || "", detail: [str(s.note), ...kids].filter(Boolean).join("\n") };
+  });
+  if (Array.isArray(v.logic_steps) && !n.flow) n.flow = conv(v.logic_steps);
+  return n;
+}
+
 export function loadInitial(): { data: Data; currentId: string | null; collapsed: string[] } {
   const stored = read<Stored>(KEY) || migrateV1();
   const docs = (stored.docs || []).filter(d => GENRES[d.genre]);
-  docs.forEach(d => ensureKeys(d.v));
+  docs.forEach(d => {
+    if (GENRES[d.genre].flow) d.v = migrateFlow(d.v);
+    ensureKeys(d.v);
+  });
   const templates: Record<string, Genre> = {};
   const t = read<Record<string, Genre>>(TPL_KEY) || {};
-  Object.keys(t).forEach(k => { if (GENRES[k]) templates[k] = t[k]; });
+  /* 形式が変わったジャンル(観点表から処理の流れへ)の、旧形式の編集済みテンプレートは使わない */
+  Object.keys(t).forEach(k => { if (GENRES[k] && !!GENRES[k].flow === !!t[k].flow) templates[k] = t[k]; });
   const currentId = docs.some(d => d.id === stored.currentId) ? stored.currentId : (docs[0] ? docs[0].id : null);
   return { data: { docs, templates }, currentId, collapsed: stored.collapsed || [] };
 }

@@ -1,5 +1,6 @@
 /* チケット本文(Markdown)の生成。画面に依存しない。
    旧版 index.html の buildTicket を移したもの。本文はパートごとのブロックに分けて返す */
+import { buildFlowTicket } from "./flow";
 import { HAS, HAS_NOT, LOGIC_SRC, MISSING, MOD, NEW, REF, type Genre, type Heads, type QNode } from "./genres";
 
 /* 入力値。キーは問いのID(と、その派生) */
@@ -10,7 +11,9 @@ export type Values = Record<string, any>;
 export const HEADS: Heads = {
   story: "ストーリー", ac: "受け入れ条件", func: "機能要件", nonfunc: "非機能要件", other: "その他",
   deps: "依存関係・環境", refs: "参考情報",
-  leadNew: "{名前}が新規作成されていること", leadMod: "{名前}が改修されていること"
+  leadNew: "{名前}が新規作成されていること", leadMod: "{名前}が改修されていること",
+  flowSuffix: "処理", flowTitle: "処理の流れ", notes: "制約事項・技術的補足", branch: "ブランチ",
+  call: "呼び出し条件", impact: "既存影響", okCase: "正常に処理が完了した場合"
 };
 export const headsOf = (g: Genre): Heads => Object.assign({}, HEADS, g.heads || {});
 
@@ -42,6 +45,7 @@ export interface Ticket { text: string; missing: number; blocks: Block[] }
 type Depth = number | string[];
 
 export function buildTicket(g: Genre, v: Values = {}): Ticket {
+  if (g.flow) return buildFlowTicket(g, v);
   const h = headsOf(g);
   const sparseAll = v.mod === MOD;   /* 既存改修は、記載のある項目だけを出力する */
   let missing = 0;

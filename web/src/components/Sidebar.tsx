@@ -21,7 +21,7 @@ export function Sidebar() {
   const q = query.trim().toLowerCase();
   const shown = rows
     .filter(r => !filter || r.d.genre === filter)
-    .filter(r => !q || (r.title + "\n" + (r.d.v.story || "") + "\n" + (r.d.v.api_name || "")).toLowerCase().includes(q))
+    .filter(r => !q || [r.title, r.d.v.story, r.d.v.story_goal, r.d.v.api_name, r.d.v.proc_name].filter(x => typeof x === "string").join("\n").toLowerCase().includes(q))
     .sort((a, b) => b.d.updatedAt - a.d.updatedAt);
 
   return (

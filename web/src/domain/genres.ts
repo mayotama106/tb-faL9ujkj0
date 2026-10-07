@@ -25,6 +25,9 @@ export interface Section { key: string; title: string; lead?: string; nodes: QNo
 export interface Heads {
   story: string; ac: string; func: string; nonfunc: string; other: string;
   deps: string; refs: string; leadNew: string; leadMod: string;
+  /* 処理の流れの形式(flow)で使う見出しと定型文 */
+  flowSuffix: string; flowTitle: string; notes: string; branch: string;
+  call: string; impact: string; okCase: string;
 }
 
 export interface Genre {
@@ -39,6 +42,7 @@ export interface Genre {
   storyHint?: string;
   sections?: Section[];
   heads?: Partial<Heads>;
+  flow?: boolean;   /* 処理の流れの形式。観点表(func など)を持たない */
 }
 
 export const MISSING = "【未記入】";
@@ -62,10 +66,6 @@ const REQ_FMT = err("req_fmt", "形式エラーの場合は？", "形式エラ�
 const REQ_MISS = err("req_miss", "必須の項目の値がない場合は？", "必須項目の値がない場合");
 const RES_FMT = err("res_fmt", "形式エラーの場合は？", "形式エラーの場合");
 const RES_MISS = err("res_miss", "必須の項目の値がない場合は？", "必須項目の値がない場合");
-const IN_FMT = err("in_fmt", "形式エラーの場合は？", "形式エラーの場合");
-const IN_MISS = err("in_miss", "必須の項目の値がない場合は？", "必須項目の値がない場合");
-const OUT_FMT = err("out_fmt", "形式エラーの場合は？", "形式エラーの場合");
-const OUT_MISS = err("out_miss", "必須の項目の値がない場合は？", "必須項目の値がない場合");
 
 /* ジャンルごとの観点表。ジャンルを増やすときは、ここに定義を足す。 */
 export const GENRES: Record<string, Genre> = {
@@ -133,35 +133,11 @@ export const GENRES: Record<string, Genre> = {
     ]
   },
   /* API作成から、API特有の項目(エンドポイント、メソッド、パラメータ形式)を除いた構成 */
+  /* 処理の流れを工程で組み立て、受け入れ条件を処理の流れから作る形式(flow.ts) */
   logic: {
     name: "ロジック作成",
-    noun: "ロジック",
-    example: "例: 手数料計算",
-    srcLabel: LOGIC_SRC,
-    func: [
-      q("trigger", "なにを起因に誰からいつ呼び出される？", "呼び出しの起因・呼び出し元・タイミング"),
-      group("in", "入力は何？", "入力", [
-        list("in_items", "項目とそれぞれの型は？", "項目と型", "項目名: 型", [IN_FMT]),
-        list("in_need", "それぞれの項目は必須か任意か", "必須/任意", "項目名: 必須または任意", [IN_MISS])
-      ], [IN_FMT, IN_MISS]),
-      { id: "logic", q: "実装するロジックは？", label: "ロジック", type: "logic", noHas: true },
-      group("out", "出力は何？", "出力", [
-        group("out_ok", "正常な場合は？", "正常な場合", [
-          list("out_items", "項目とそれぞれの型は？", "項目と型", "項目名: 型", [OUT_FMT]),
-          list("out_need", "それぞれの項目は必須か任意か", "必須/任意", "項目名: 必須または任意", [OUT_MISS])
-        ], [OUT_FMT, OUT_MISS]),
-        err("out_ng", "異常の場合は？", "異常の場合")
-      ])
-    ],
-    nonfunc: [
-      q("nf_freq", "呼び出し頻度は？", "呼び出し頻度"),
-      q("nf_timeout", "タイムアウトの時間は？", "タイムアウト時間"),
-      q("nf_volume", "データ量の上限は？(任意)", "データ量の上限", { optional: true })
-    ],
-    modOnly: [
-      q("mod_impact", "既存影響は？", "既存影響", { always: true }),
-      q("mod_doc", "設計書の書き直しは必要？", "設計書の書き直し要否", { always: true })
-    ]
+    flow: true,
+    heads: { deps: "依存関係" }
   },
   screen: {
     name: "画面作成",

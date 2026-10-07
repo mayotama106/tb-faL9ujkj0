@@ -86,7 +86,7 @@ button:disabled { cursor: default; }
 }
 .tog-space { width: 18px; flex: 0 0 auto; }
 .kids { margin: 10px 0 0 6px; padding-left: 14px; border-left: 3px solid var(--lv); }
-textarea, input[type="search"] {
+textarea, input[type="search"], input[type="text"] {
   width: 100%; font: inherit; color: var(--navy);
   background: var(--field); border: 1px solid var(--mist); border-radius: 8px;
   padding: 8px 10px; display: block;
@@ -254,3 +254,26 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
 .toast .x { background: transparent; border: 0; color: #fff; cursor: pointer; font-size: 16px; width: 28px; height: 28px; border-radius: 6px; }
 .toast .x:hover { background: rgba(255, 255, 255, 0.12); }
 .welcome { padding: 28px; }
+
+/* ===== 処理の流れの形式(ロジック作成) ===== */
+.badge.chk { background: #51607F; }
+.guide { background: var(--field); border: 1px dashed var(--mist); border-radius: 10px; padding: 10px 14px; margin: 12px 0; font-size: 13px; }
+.guide ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); }
+.q.small { font-size: 13px; }
+.codes { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 4px; }
+.codes label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.codes input.code { width: 9.5em; padding: 5px 8px; font-family: ui-monospace, Consolas, monospace; }
+.codes input.code.empty { border-color: var(--gold); background: #fff8ef; }
+.check-item { background: var(--field); border: 1px solid var(--mist); border-radius: 10px; padding: 8px 10px; margin-top: 8px; }
+.check-item .row { margin-bottom: 0; align-items: flex-end; }
+.check-item .grow { flex: 1 1 auto; min-width: 0; }
+.check-item .node { margin-top: 6px; }
+.check-item .node > label { font-size: 13px; }
+.branch-box { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(251, 250, 247, 0.6); }
+.branch-box > .chips { margin-top: 6px; }
+.none-chip { margin-top: 8px; }
+.ac-table { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+.ac-group { background: var(--field); border: 1px solid var(--mist); border-radius: 10px; padding: 10px 12px; }
+.ac-case { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 0 0 12px; border-top: 1px dashed rgba(161, 178, 214, 0.6); margin-top: 6px; }
+.ac-case .lbl { flex: 1 1 220px; font-size: 14px; }
+.ac-ok { margin-top: 16px; }

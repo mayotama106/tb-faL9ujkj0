@@ -7,6 +7,13 @@ export const FINAL = "final";
 
 export function partsOf(g: Genre): Part[] {
   const h = headsOf(g);
+  if (g.flow) return [
+    { key: "basic", title: "タイトルと" + h.story },
+    { key: "flow", title: h.flowTitle },
+    { key: "ac", title: h.ac },
+    { key: "notes", title: h.notes },
+    { key: FINAL, title: "仕上げ" }
+  ];
   if (g.sections) return [
     { key: "basic", title: "タイトルと" + (g.storyLabel || "概要") },
     ...g.sections.map(s => ({ key: "sec:" + s.key, title: s.title })),

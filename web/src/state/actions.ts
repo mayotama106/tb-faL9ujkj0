@@ -1,4 +1,5 @@
 /* チケットの作成・複製・削除など、一覧と画面から呼ぶ操作 */
+import { GENRES } from "../domain/genres";
 import { getState, newId, setUI, toast, update, type Doc } from "./store";
 import { ensureKeys } from "./persist";
 
@@ -12,7 +13,7 @@ export function goPart(docId: string, key: string) {
 }
 export function createDoc(genre: string) {
   const now = Date.now();
-  const doc: Doc = { id: newId(), genre, v: {}, createdAt: now, updatedAt: now };
+  const doc: Doc = { id: newId(), genre, v: GENRES[genre].flow ? { _flow: 1 } : {}, createdAt: now, updatedAt: now };
   update(d => { d.docs.unshift(doc); });
   openDoc(doc.id);
 }
@@ -38,7 +39,7 @@ export function deleteDoc(id: string) {
 export function clearDoc(id: string) {
   update(d => {
     const doc = d.docs.find(x => x.id === id);
-    if (doc) { doc.v = {}; doc.updatedAt = Date.now(); }
+    if (doc) { doc.v = GENRES[doc.genre].flow ? { _flow: 1 } : {}; doc.updatedAt = Date.now(); }
   });
   setUI(ui => ({ part: { ...ui.part, [id]: "basic" } }));
   toast("入力を消去した", true);
