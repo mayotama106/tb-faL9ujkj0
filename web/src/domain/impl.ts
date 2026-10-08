@@ -1,7 +1,8 @@
 /* 実装チケットの本文。部品(components.ts)の組み合わせから、処理の流れと受け入れ条件を作る。
 
    チケットの入力値:
-     title, story_goal, story_scope, story_refs[], mod   タイトルとストーリー
+     title, story_goal, story_refs[], mod                タイトルとストーリー
+     scope_in[], scope_out[], scope_out_none              スコープ(スコープ内とスコープ外)
      proc_name, blocks[]                                  組み立て(部品の並び)
      ok_status, ok_body, ac_extra[]                       受け入れ条件(正常時と追加分)
      deps[], deps_none, branch, call, nonfunc, impact     制約事項・技術的補足
@@ -205,7 +206,15 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
   block("basic", () => {
     if (!t(v.title)) missing++;
     const refs = listItems(v.story_refs).flatMap(r => headed(1, r));
-    return ["## " + h.story, "", ...headed(0, req(v.story_goal)), ...headed(0, req(v.story_scope)), ...refs];
+    const out = ["## " + h.story, "", ...headed(0, req(v.story_goal)), ...refs];
+    /* スコープはストーリーと同じ階層の節。スコープ外がないなら「なし」と明示する */
+    const inn = listItems(v.scope_in), outs = listItems(v.scope_out);
+    out.push("", "## " + h.scope, "### " + h.scopeIn, "");
+    if (inn.length) inn.forEach(x => out.push(...headed(0, x))); else out.push(bullet(0, miss()));
+    out.push("", "### " + h.scopeOut, "");
+    if (outs.length) outs.forEach(x => out.push(...headed(0, x)));
+    else out.push(bullet(0, v.scope_out_none ? "なし" : miss()));
+    return out;
   });
 
   block("build", () => {

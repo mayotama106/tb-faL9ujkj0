@@ -4,14 +4,15 @@ import { COMPONENTS, NA } from "./components";
 import { GENRES } from "./genres";
 import { collectAc } from "./impl";
 import { buildTicket, type Values } from "./ticket";
-import { toImpl } from "../state/migrateImpl";
+import { toImpl, upgradeImpl } from "../state/migrateImpl";
 
 const be = (status = "", code = "") => ({ display: "表示しない", status, code });
 const chk = (name: string, err = be(), detail = "") => ({ name, detail, err });
 const sample: Values = {
   title: "ファイルアップロード機能の構築（BE）",
   story_goal: "口座開設審査に必要な書類をオンラインでアップロードできる機能を提供したい",
-  story_scope: "本チケットでは書類をアップロードする基本的な機能を実装する",
+  scope_in: ["書類をアップロードする基本的な機能"],
+  scope_out: ["アップロードした書類の削除"],
   story_refs: ["機能AのアップロードAPIを参照する（PUT：/account/applications/documents/:documentType）"],
   proc_name: "ファイルアップロード",
   blocks: [
@@ -37,8 +38,16 @@ const sample: Values = {
 const expected = `## ストーリー
 
 * 口座開設審査に必要な書類をオンラインでアップロードできる機能を提供したい
-* 本チケットでは書類をアップロードする基本的な機能を実装する
    * 機能AのアップロードAPIを参照する（PUT：/account/applications/documents/:documentType）
+
+## スコープ
+### スコープ内
+
+* 書類をアップロードする基本的な機能
+
+### スコープ外
+
+* アップロードした書類の削除
 
 ## ファイルアップロード処理
 ### 処理の流れ
@@ -117,6 +126,12 @@ describe("実装チケット", () => {
     expect(r.blocks.map(b => [b.key, b.missing])).toEqual([["basic", 0], ["build", 0], ["ac", 5], ["notes", 0]]);
   });
 
+  it("スコープ外がないときは「なし」を選ぶと未記入にならない", () => {
+    const base = { ...sample, scope_out: [] };
+    expect(buildTicket(GENRES.impl, base).text).toContain("### スコープ外\n\n* 【未記入】");
+    expect(buildTicket(GENRES.impl, { ...base, scope_out_none: true }).text).toContain("### スコープ外\n\n* なし");
+  });
+
   it("空のチケットでは、各節に未記入を出す", () => {
     const r = buildTicket(GENRES.impl, {});
     expect(r.blocks.every(b => b.missing > 0)).toBe(true);
@@ -168,6 +183,10 @@ describe("実装チケット", () => {
 });
 
 describe("旧形式からの引き継ぎ", () => {
+  it("1つの文だった「本チケットの範囲」を、スコープ内の1件にする", () => {
+    expect(upgradeImpl({ _impl: 1, story_scope: "範囲" })).toEqual({ _impl: 1, scope_in: ["範囲"] });
+    expect(toImpl("logic", { _flow: 1, story_scope: "範囲" }).scope_in).toEqual(["範囲"]);
+  });
   it("処理の流れの形式(ロジック作成)を部品に移すと、同じ本文になる", () => {
     const old: Values = { _flow: 1, title: "t", story_goal: "g", proc_name: "p", flow: [
       { kind: "checks", text: "チェック", ac: "", items: [{ name: "a", detail: "", status: "400", code: "E1" }] },

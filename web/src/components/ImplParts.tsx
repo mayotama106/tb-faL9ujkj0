@@ -17,10 +17,19 @@ export function ImplPart({ g, partKey }: { g: Genre; partKey: string }) {
     case "basic": return <>
       <Field path={["title"]} label="タイトル(Jiraの要約欄に入れる)" ph="例: ファイルアップロード機能の構築（BE）" />
       <Field path={["story_goal"]} label="何を提供したい？(誰に、どんな価値を)" ph="例: 口座開設審査に必要な書類をオンラインでアップロードできる機能を提供したい" />
-      <Field path={["story_scope"]} label="本チケットの範囲は？(何を実装するか)" ph="例: 本チケットでは書類をアップロードする基本的な機能を実装する" />
       <div className="node">
         <div className="head"><div className="q">参照するものは？(APIや設計書。メソッドとパス)</div><span className="opt">任意</span></div>
         <ListControl node={listNode("story_refs", "参照するもの", "例: 機能AのアップロードAPIを参照する（PUT：/account/applications/documents/:documentType）")} />
+      </div>
+      <div className="node">
+        <div className="q">{h.scopeIn}は？(本チケットで実装すること。1件ずつ)</div>
+        <ListControl node={listNode("scope_in", h.scopeIn, "例: 書類をアップロードする基本的な機能")} />
+      </div>
+      <div className="node">
+        <div className="q">{h.scopeOut}は？(本チケットでは実装しないこと。1件ずつ)</div>
+        <ListControl node={listNode("scope_out", h.scopeOut, "例: アップロードした書類の削除(別チケット)")} />
+        {!(Array.isArray(v.scope_out) ? v.scope_out : []).some((x: unknown) => typeof x === "string" && x.trim()) &&
+          <div className="none-chip"><Chips path={["scope_out_none"]} label="スコープ外がない" options={["なし"]} /></div>}
       </div>
       <div className="node">
         <div className="q">新規作成か、既存改修か</div>

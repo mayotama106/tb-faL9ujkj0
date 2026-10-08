@@ -28,6 +28,7 @@ export interface Heads {
   /* 実装チケットで使う見出しと定型文 */
   flowSuffix: string; flowTitle: string; notes: string; branch: string;
   call: string; impact: string; okCase: string;
+  scope: string; scopeIn: string; scopeOut: string;
 }
 
 export interface Genre {

@@ -8,7 +8,7 @@ export const FINAL = "final";
 export function partsOf(g: Genre): Part[] {
   const h = headsOf(g);
   if (g.impl) return [
-    { key: "basic", title: "タイトルと" + h.story },
+    { key: "basic", title: "タイトル・" + h.story + "・" + h.scope },
     { key: "build", title: "組み立て" },
     { key: "ac", title: h.ac },
     { key: "notes", title: h.notes },

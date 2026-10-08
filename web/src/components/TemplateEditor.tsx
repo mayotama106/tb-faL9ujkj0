@@ -97,7 +97,7 @@ function GenreEditor({ genre }: { genre: string }) {
       <section className="card">
         <h2>本文の構成</h2>
         {g.impl ? <>
-          {([["story", "ストーリー"], ["flowSuffix", "処理の見出しの末尾(〇〇処理)"], ["flowTitle", "処理の流れ"], ["ac", "受け入れ条件"],
+          {([["story", "ストーリー"], ["scope", "スコープ"], ["scopeIn", "スコープ内"], ["scopeOut", "スコープ外"], ["flowSuffix", "処理の見出しの末尾(〇〇処理)"], ["flowTitle", "処理の流れ"], ["ac", "受け入れ条件"],
             ["okCase", "受け入れ条件の正常時の書き方"], ["notes", "制約事項・技術的補足"], ["branch", "ブランチ"],
             ["call", "呼び出し条件"], ["nonfunc", "非機能要件"], ["impact", "既存影響"]] as const)
             .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}

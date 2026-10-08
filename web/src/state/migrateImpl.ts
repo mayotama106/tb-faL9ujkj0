@@ -87,7 +87,7 @@ function etcLines(v: Values): string[] {
 function common(v: Values): Values {
   const n: Values = { _impl: 1, title: v.title || "", mod: v.mod || "" };
   n.story_goal = v.story_goal || v.story || "";
-  n.story_scope = v.story_scope || "";
+  n.scope_in = scopeIn(v);
   n.story_refs = Array.isArray(v.story_refs) ? v.story_refs : lines(v.refs);
   n.deps = Array.isArray(v.deps) ? v.deps : s(v.deps) ? [s(v.deps)] : [];
   ["deps_none", "branch", "call", "nonfunc", "impact", "ok_status", "ok_body", "ac_extra", "proc_name"].forEach(k => { if (v[k] != null) n[k] = v[k]; });
@@ -163,4 +163,17 @@ export function toImpl(genre: string, v: Values): Values {
   if (genre === "api") return fromApi(v);
   if (genre === "screen") return fromScreen(v);
   return fromLogic(v);
+}
+
+/* 旧形式の「本チケットの範囲」(1つの文)を、スコープ内の1件にする */
+function scopeIn(v: Values): string[] {
+  if (Array.isArray(v.scope_in)) return v.scope_in;
+  return s(v.story_scope) ? [s(v.story_scope)] : [];
+}
+/* 実装チケットの入力を、今の形に合わせる(スコープ内・スコープ外の追加) */
+export function upgradeImpl(v: Values): Values {
+  if (Array.isArray(v.scope_in) || !s(v.story_scope)) return v;
+  const n: Values = { ...v, scope_in: scopeIn(v) };
+  delete n.story_scope;
+  return n;
 }

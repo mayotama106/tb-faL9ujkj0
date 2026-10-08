@@ -1,7 +1,7 @@
 /* ブラウザ内(localStorage)への保存と、旧版のデータの引き継ぎ */
 import { COMPONENTS, type CompDef } from "../domain/components";
 import { GENRES, type Genre } from "../domain/genres";
-import { OLD_IMPL_GENRES, toImpl } from "./migrateImpl";
+import { OLD_IMPL_GENRES, toImpl, upgradeImpl } from "./migrateImpl";
 import type { Values } from "../domain/ticket";
 import type { Data, Doc, State } from "./store";
 
@@ -85,7 +85,10 @@ export function loadInitial(): { data: Data; currentId: string | null; collapsed
     try { if (!localStorage.getItem(BACKUP_KEY)) localStorage.setItem(BACKUP_KEY, JSON.stringify(stored)); } catch { /* 何もしない */ }
     docs.forEach(d => { if (OLD_IMPL_GENRES.includes(d.genre)) { d.v = toImpl(d.genre, d.v); d.genre = "impl"; } });
   }
-  docs.forEach(d => ensureKeys(d.v));
+  docs.forEach(d => {
+    if (GENRES[d.genre] && GENRES[d.genre].impl) d.v = upgradeImpl(d.v);
+    ensureKeys(d.v);
+  });
   const templates: Record<string, Genre> = {};
   const t = read<Record<string, Genre>>(TPL_KEY) || {};
   Object.keys(t).forEach(k => { if (GENRES[k] && !GENRES[k].impl === !t[k].impl) templates[k] = t[k]; });
