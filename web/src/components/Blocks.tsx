@@ -1,5 +1,5 @@
 /* 実装チケットの部品の入力。部品は欄(FieldDef)の並びで定義され、欄の種類ごとに入力欄を出す */
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import {
   DISPLAYS, GROUPS, NA, NONE, NO_DISPLAY, newBlock,
   type CaseVal, type CompDef, type FieldDef
@@ -26,20 +26,16 @@ function Del({ label, onClick }: { label: string; onClick: () => void }) {
 /* 部品の追加ボタン。入れ物はチケットの直下にだけ置ける */
 function Palette({ top, groups, onAdd }: { top: boolean; groups: string[]; onAdd: (def: CompDef) => void }) {
   const defs = useDefs();
-  /* 入れ子の中では、押すまでボタンを1つにたたんでおく */
-  const [open, setOpen] = useState(top);
-  if (!open) return <button type="button" className="etc-btn pal-open" onClick={() => setOpen(true)}>＋ 部品を追加</button>;
   return (
     <div className="palette">
       {groups.filter(g => top || g !== "入れ物").map(g => (
         <div key={g} className="pal-row">
           <span className="pal-g">{g}</span>
           {Object.values(defs).filter(d => d.group === g).map(d => (
-            <button key={d.type} type="button" className={"etc-btn pal-" + groupClass(d.group)} onClick={() => { onAdd(d); if (!top) setOpen(false); }}>＋ {d.name}</button>
+            <button key={d.type} type="button" className={"etc-btn pal-" + groupClass(d.group)} onClick={() => onAdd(d)}>＋ {d.name}</button>
           ))}
         </div>
       ))}
-      {!top && <button type="button" className="link pal-close" onClick={() => setOpen(false)}>閉じる</button>}
     </div>
   );
 }
@@ -123,20 +119,11 @@ function FieldView({ f, path }: { f: FieldDef; path: Path }) {
     case "group": return <GroupView f={f} path={path} />;
     case "error": return <div className="node"><Q f={f} /><ErrorEditor path={p} /></div>;
     case "case": return <CaseView f={f} path={p} />;
-    case "blocks": return f.optional ? <OptionalBlocks f={f} path={p} /> : <div className="node"><Q f={f} /><BlockList path={p} /></div>;
+    case "blocks": return <div className="node"><Q f={f} /><BlockList path={p} /></div>;
     case "rows": return <RowsView f={f} path={path} />;
     case "branches": return <BranchesView f={f} path={p} />;
   }
   return null;
-}
-
-/* 任意の中の部品(処理実行の中の処理など)。空のうちはボタンだけを出し、押すと部品の追加ボタンを出す */
-function OptionalBlocks({ f, path }: { f: FieldDef; path: Path }) {
-  const items = useVAt(path);
-  const [open, setOpen] = useState(false);
-  if (!(Array.isArray(items) && items.length) && !open)
-    return <button type="button" className="etc-btn" onClick={() => setOpen(true)}>＋ {f.label}を入れる(入れ子)</button>;
-  return <div className="node"><Q f={f} /><BlockList path={path} /></div>;
 }
 
 /* 原典を参照して省略する。参照するなら、原典のリンクだけを書く */
