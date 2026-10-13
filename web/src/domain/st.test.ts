@@ -65,6 +65,14 @@ describe("STチケット", () => {
     const defs = { ...COMPONENTS, st_account: { ...COMPONENTS.st_account, ac: ["アカウントが払い出されていること"] } };
     expect(buildTicket(GENRES.st, v, defs).text).toContain("* アカウントが払い出されていること");
   });
+  it("その他の手順は、受け入れ条件の欄に書けばそれを使い、空なら「〇〇が完了していること」にする", () => {
+    const r = buildTicket(GENRES.st, { ...v, ac_extra: [], steps: [
+      step("st_prep_other", { name: "テストデータ投入", detail: "100件投入する", link: "手順書" }),
+      step("st_exec_other", { name: "性能測定", ac: "応答が3秒以内であること" })] });
+    expect(r.text).toContain("1. テストデータ投入\n   * 100件投入する\n   * リンク：手順書\n2. 性能測定\n\n## 受け入れ条件");
+    expect(r.text).toContain("* テストデータ投入が完了していること\n* 応答が3秒以内であること");
+    expect(r.missing).toBe(0);
+  });
   it("空のチケットでは各節に未記入を出す", () => {
     const r = buildTicket(GENRES.st, {});
     expect(r.blocks.every(b => b.missing > 0)).toBe(true);

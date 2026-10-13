@@ -20,6 +20,9 @@ export function stepAc(defs: Record<string, CompDef>, steps: unknown): string[] 
     if (!def) return [];
     const hf = def.fields.find(f => f.head);
     const name = (hf && t(b[hf.id]).split("\n")[0]) || def.name;
+    /* 受け入れ条件の欄に書いてあれば、部品の定義の文言の代わりにそれを使う */
+    const own = def.fields.filter(f => f.ac).flatMap(f => linesOf(b[f.id]));
+    if (own.length) return own;
     return (def.ac || []).map(a => a.split("{名前}").join(name));
   });
 }

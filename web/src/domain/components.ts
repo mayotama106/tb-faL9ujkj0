@@ -246,6 +246,29 @@ export const COMPONENTS: Record<string, CompDef> = {
       t("proof", "証跡の格納先のリンクは？", "証跡格納先")
     ]
   },
+  /* 型に当てはまらない準備・実施の手順。受け入れ条件は欄に書けば、それを使う */
+  st_prep_other: {
+    type: "st_prep_other", name: "その他(準備)", group: "テスト準備",
+    hint: "テストケース準備・アカウント準備に当てはまらない準備を書く。",
+    ac: ["{名前}が完了していること"],
+    fields: [
+      head("手順の名前は？", "例: テストデータ投入"),
+      t("detail", "何をする？(任意。1行ごとに箇条書きになる)", "内容", { optional: true, bare: true }),
+      t("link", "関連するリンクは？(任意)", "リンク", { optional: true }),
+      t("ac", "受け入れ条件は？(任意。空なら「〇〇が完了していること」)", "受け入れ条件", { ac: true, optional: true })
+    ]
+  },
+  st_exec_other: {
+    type: "st_exec_other", name: "その他(実施)", group: "テスト実施",
+    hint: "打鍵に当てはまらない実施の手順を書く。",
+    ac: ["{名前}が完了していること"],
+    fields: [
+      head("手順の名前は？", "例: 性能測定"),
+      t("detail", "何をする？(任意。1行ごとに箇条書きになる)", "内容", { optional: true, bare: true }),
+      t("link", "関連するリンクは？(任意)", "リンク", { optional: true }),
+      t("ac", "受け入れ条件は？(任意。空なら「〇〇が完了していること」)", "受け入れ条件", { ac: true, optional: true })
+    ]
+  },
   do: {
     type: "do", name: "処理実行", group: "処理", hint: "ほかの部品に当てはまらない処理を書く。",
     fields: [
