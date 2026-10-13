@@ -19,6 +19,7 @@ export function StPart({ g, partKey }: { g: Genre; partKey: string }) {
       <Field path={["title"]} label="タイトル(Jiraの要約欄に入れる)" ph="例: ファイルアップロード機能のST実施" />
       <Field path={["content"]} label={h.content + "は？(何をテストするか。1行ごとに箇条書きになる)"} ph="例: ファイルアップロード機能の正常系・異常系をテストする" />
       <Field path={["schedule"]} label={h.schedule + "は？(1行ごとに箇条書きになる)"} ph={"例: 準備 10/20〜10/21\n実施 10/22〜10/24"} />
+      <Field path={["env"]} label={h.env + "は？(環境名、端末・ブラウザ、ビルドなど。1行ごとに箇条書きになる)"} ph={"例: ST環境\nWindows 11 / Chrome 最新"} />
     </>;
     case "steps": return <>
       <p className="hint">手順の部品を上から並べる。部品ごとに、受け入れ条件が自動でできる。よく使う手順は最初から入っている(不要なら × で消す)。</p>

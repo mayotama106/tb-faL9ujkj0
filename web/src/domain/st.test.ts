@@ -12,6 +12,7 @@ const v: Values = {
   title: "ファイルアップロード機能のST",
   content: "ファイルアップロード機能の正常系・異常系をテストする",
   schedule: "準備 10/20〜10/21\n実施 10/22〜10/24",
+  env: "ST環境",
   steps: [
     step("st_case", { scenario: "シナリオのリンク", store: "テストケースのリンク" }),
     step("st_account", { store: "アカウント情報のリンク" }),
@@ -29,6 +30,10 @@ const expected = `## 実施概要
 
 * 準備 10/20〜10/21
 * 実施 10/22〜10/24
+
+### 実施環境
+
+* ST環境
 
 ## 実施手順
 

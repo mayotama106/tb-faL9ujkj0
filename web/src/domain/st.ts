@@ -2,7 +2,7 @@
    受け入れ条件は、実施手順の部品1つにつき、部品の定義の ac から作る(手順と1対1)。
 
    チケットの入力値:
-     title, content, schedule      タイトルと実施概要
+     title, content, schedule, env タイトルと実施概要(内容・スケジュール・実施環境)
      steps[]                       実施手順(部品の並び)
      ac_extra[]                    手順と1対1でない受け入れ条件 */
 import { COMPONENTS, type CompDef, type FieldDef } from "./components";
@@ -54,7 +54,8 @@ export function buildStTicket(g: Genre, v: Values, defs: Record<string, CompDef>
 
   block("basic", () => {
     if (!t(v.title)) missing++;
-    return ["## " + h.overview, "### " + h.content, "", ...lines(v.content), "", "### " + h.schedule, "", ...lines(v.schedule)];
+    return ["## " + h.overview, "### " + h.content, "", ...lines(v.content), "", "### " + h.schedule, "", ...lines(v.schedule),
+      "", "### " + h.env, "", ...lines(v.env)];
   });
   block("steps", () => {
     const steps = arr(v.steps);

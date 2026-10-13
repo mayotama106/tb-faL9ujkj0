@@ -17,7 +17,7 @@ export const HEADS: Heads = {
   flowSuffix: "処理", flowTitle: "処理の流れ", notes: "制約事項・技術的補足", branch: "ブランチ",
   call: "呼び出し条件", impact: "既存影響", okCase: "正常に処理が完了した場合",
   scope: "スコープ", scopeIn: "スコープ内", scopeOut: "スコープ外",
-  overview: "実施概要", content: "内容", schedule: "スケジュール", steps: "実施手順"
+  overview: "実施概要", content: "内容", schedule: "スケジュール", env: "実施環境", steps: "実施手順"
 };
 export const headsOf = (g: Genre): Heads => Object.assign({}, HEADS, g.heads || {});
 

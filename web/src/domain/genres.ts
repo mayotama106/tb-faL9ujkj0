@@ -30,7 +30,7 @@ export interface Heads {
   call: string; impact: string; okCase: string;
   scope: string; scopeIn: string; scopeOut: string;
   /* STチケットで使う見出し */
-  overview: string; content: string; schedule: string; steps: string;
+  overview: string; content: string; schedule: string; env: string; steps: string;
 }
 
 export interface Genre {

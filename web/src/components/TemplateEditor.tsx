@@ -111,7 +111,7 @@ function GenreEditor({ genre }: { genre: string }) {
       <section className="card">
         <h2>本文の構成</h2>
         {g.st ? <>
-          {([["overview", "実施概要"], ["content", "内容"], ["schedule", "スケジュール"], ["steps", "実施手順"], ["ac", "受け入れ条件"]] as const)
+          {([["overview", "実施概要"], ["content", "内容"], ["schedule", "スケジュール"], ["env", "実施環境"], ["steps", "実施手順"], ["ac", "受け入れ条件"]] as const)
             .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
           <p className="hint">実施手順の部品と、部品ごとの受け入れ条件の文言は、上の「部品」から選んで編集する。</p>
         </> : g.impl ? <>
