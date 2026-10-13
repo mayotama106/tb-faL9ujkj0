@@ -5,7 +5,7 @@
      title, content, schedule, env タイトルと実施概要(内容・スケジュール・実施環境)
      steps[]                       実施手順(部品の並び)
      ac_extra[]                    手順と1対1でない受け入れ条件 */
-import { COMPONENTS, type CompDef, type FieldDef } from "./components";
+import { COMPONENTS, fillAc, type CompDef, type FieldDef } from "./components";
 import { MISSING, type Genre } from "./genres";
 import { headsOf, listItems, type Block, type Ticket, type Values } from "./ticket";
 
@@ -23,7 +23,7 @@ export function stepAc(defs: Record<string, CompDef>, steps: unknown): string[] 
     /* 受け入れ条件の欄に書いてあれば、部品の定義の文言の代わりにそれを使う */
     const own = def.fields.filter(f => f.ac).flatMap(f => linesOf(b[f.id]));
     if (own.length) return own;
-    return (def.ac || []).map(a => a.split("{名前}").join(name));
+    return (def.ac || []).map(a => fillAc(a, def, hf ? { ...b, [hf.id]: name } : b, MISSING));
   });
 }
 

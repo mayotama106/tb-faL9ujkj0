@@ -8,7 +8,7 @@
      deps[], deps_none, branch, call, nonfunc, impact     制約事項・技術的補足
    受け入れ条件は、部品の中のエラーハンドリング(エラーの欄、エラーにした「〇〇の場合」、
    エラーハンドリングの部品)を1件ずつ集めて作る */
-import { COMPONENTS, NA, NONE, NO_DISPLAY, errorHead, type CaseVal, type CompDef, type ErrVal, type FieldDef } from "./components";
+import { COMPONENTS, NA, NONE, NO_DISPLAY, errorHead, fillAc, type CaseVal, type CompDef, type ErrVal, type FieldDef } from "./components";
 import { MISSING, MOD, type Genre } from "./genres";
 import { headsOf, listItems, type Block, type Ticket, type Values } from "./ticket";
 
@@ -22,29 +22,37 @@ const headOf = (fields: FieldDef[]) => fields.find(f => f.head);
 const usable = (f: FieldDef, o: Values) => !f.when || o[f.when.id] === f.when.eq;
 export const isEmptyErr = (e: ErrVal | undefined) => !e || !["display", "status", "code", "message", "note"].some(k => t((e as Values)[k]));
 
-/* 受け入れ条件の1件。path は入力値の中の位置(画面から同じエラーを編集するため) */
-export interface AcCase { label: string; err: ErrVal; path: Path }
+/* 受け入れ条件。部品1つにつき1件(lead)を作り、その下にエラーハンドリングと「〇〇の場合」を並べる。
+   err のない項目は文だけの受け入れ条件。path は入力値の中の位置(画面から同じエラーを編集するため) */
+export interface AcCase { label: string; err?: ErrVal; path?: Path }
 export interface AcGroup { lead: string; cases: AcCase[] }
+
+const endKoto = (s: string) => (/(こと|。)$/.test(s) ? s : s + "こと");
 
 /* 部品の並びから、受け入れ条件を集める */
 export function collectAc(defs: Defs, v: Values): AcGroup[] {
   const groups: AcGroup[] = [];
-  const push = (lead: string, c: AcCase) => {
+  const group = (lead: string) => {
     let g = groups.find(x => x.lead === lead);
     if (!g) { g = { lead, cases: [] }; groups.push(g); }
-    g.cases.push(c);
+    return g;
   };
+  const push = (lead: string, c: AcCase) => group(lead).cases.push(c);
+  /* caseLabel は条件分岐の場合の中の部品のときの「〇〇場合」。中の部品の受け入れ条件の頭に付ける */
   const walk = (blocks: unknown, base: Path, outer: string, caseLabel?: string) => arr(blocks).forEach((b, i) => {
     const p = [...base, i];
     const def = defs[b.type];
     if (!def) return;
-    const hf = headOf(def.fields);
-    const name = (hf && t(b[hf.id]).split("\n")[0]) || MISSING;
-    const lead = t(b.ac) || (def.container ? name + (def.suffix || "") : name + (def.acSuffix || ""));
     if (def.type === "error") {
       push(outer, { label: t(b.when) || caseLabel || MISSING, err: b.err || {}, path: [...p, "err"] });
       return;
     }
+    const own = t(b.ac) ? [t(b.ac)] : (def.ac || []).map(a => fillAc(a, def, b, MISSING));
+    const leads = own.length ? own : [((headOf(def.fields) && t(b[headOf(def.fields)!.id]).split("\n")[0]) || MISSING)];
+    const withCase = (s: string) => (caseLabel ? caseLabel + "、" + s : s);
+    const lead = withCase(leads[0]);
+    group(lead);
+    leads.slice(1).forEach(l => group(withCase(l)));
     const fields = (fs: FieldDef[], o: Values, op: Path, rowName?: string) => fs.forEach(f => {
       if (!usable(f, o)) return;
       const label = rowName != null ? (f.label.includes("{行}") ? f.label.split("{行}").join(rowName) : rowName + "：" + f.label) : f.label;
@@ -54,6 +62,7 @@ export function collectAc(defs: Defs, v: Values): AcGroup[] {
       } else if (f.kind === "case") {
         const cv: CaseVal = o[f.id] || {};
         if (cv.mode === "error") push(lead, { label, err: cv.err || {}, path: [...op, f.id, "err"] });
+        else if (cv.mode === "text" && t(cv.text)) push(lead, { label: label + "、" + endKoto(t(cv.text).split("\n")[0]) });
       } else if (f.kind === "group") {
         if (!(f.ref && o[f.id + "_ref"])) fields(f.fields || [], o, op);
       } else if (f.kind === "rows") {
@@ -64,7 +73,9 @@ export function collectAc(defs: Defs, v: Values): AcGroup[] {
         walk(o[f.id], [...op, f.id], rowName && rowName !== MISSING ? rowName : lead);
       } else if (f.kind === "branches") {
         arr(o[f.id]).forEach((c, j) => {
-          if (!c.none) walk(c.blocks, [...op, f.id, j, "blocks"], lead, (t(c.cond) || MISSING) + "場合");
+          const cond = (t(c.cond) || MISSING) + "場合";
+          if (c.none) push(lead, { label: cond + "、" + NONE + "こと" });
+          else walk(c.blocks, [...op, f.id, j, "blocks"], lead, cond);
         });
       }
     });
@@ -242,7 +253,7 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
     const out = ["", "## " + h.ac, ""];
     collectAc(defs, v).forEach(gr => {
       out.push(bullet(0, gr.lead));
-      gr.cases.forEach(c => out.push(bullet(1, c.label), ...errLines(c.err, 2)));
+      gr.cases.forEach(c => out.push(bullet(1, c.label), ...(c.err ? errLines(c.err, 2) : [])));
     });
     out.push(bullet(0, h.okCase), bullet(1, "HTTPステータス：" + req(v.ok_status)));
     const body = linesOf(v.ok_body);

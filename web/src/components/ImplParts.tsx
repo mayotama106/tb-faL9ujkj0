@@ -50,22 +50,22 @@ export function ImplPart({ g, partKey }: { g: Genre; partKey: string }) {
       const groups = collectAc(defs, v);
       return <>
         <CodeLists />
-        <p className="hint">部品の中のエラーハンドリングから自動で作る。ここでまとめて記入できる(部品の側と同じ値)。</p>
+        <p className="hint">組み立ての部品ごとに自動で作る(部品1つにつき1件。その下に、エラーハンドリングと「〇〇場合」が並ぶ)。エラーの内容はここでまとめて記入できる(部品の側と同じ値)。文言は「テンプレートを編集」から部品ごとに変えられる。</p>
         {groups.length ? (
           <div className="ac-table">
             {groups.map((gr, i) => (
               <div key={i} className="ac-group">
                 <div className="q">{gr.lead}</div>
-                {gr.cases.map(c => (
+                {gr.cases.map((c, j) => c.err && c.path ? (
                   <div key={c.path.join(".")} className="ac-case">
                     <span className="lbl">{c.label}</span>
                     <ErrorEditor path={c.path} />
                   </div>
-                ))}
+                ) : <div key={"t" + j} className="ac-case plain">{c.label}</div>)}
               </div>
             ))}
           </div>
-        ) : <p className="hint">組み立てでエラーハンドリングを足すと、ここに受け入れ条件ができる。</p>}
+        ) : <p className="hint">組み立てで部品を足すと、ここに受け入れ条件ができる。</p>}
         <div className="node ac-ok">
           <div className="q">{h.okCase}は？</div>
           <Field path={["ok_status"]} label="HTTPステータス" ph="例: 200" />

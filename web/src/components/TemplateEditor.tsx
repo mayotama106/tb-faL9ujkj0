@@ -251,7 +251,7 @@ function CompEditor({ type }: { type: string }) {
       <EdField label="入力画面に出す説明(任意)" value={def.hint || ""} onChange={val => editComp(type, d => { d.hint = val || undefined; }, "hint")} />
       {def.defaultName != null && <EdField label="足したときの手順の名前(初期値)" value={def.defaultName}
         onChange={val => editComp(type, d => { d.defaultName = val; }, "defaultName")} />}
-      {def.ac && <OptionsField label="この手順から作る受け入れ条件(1行に1つ。{名前} は手順の名前に置き換わる)" options={def.ac}
+      {def.ac && <OptionsField label="この部品から作る受け入れ条件(1行に1つ。{名前}は見出しの値、{名前:できる}は「〜できる」の形、{欄の表記}はその欄の値に置き換わる)" options={def.ac}
         onChange={lines => editComp(type, d => { d.ac = lines; }, "ac")} />}
       <button type="button" className="plain" disabled={!edited} onClick={() => {
         update(d => { delete d.comps[type]; });

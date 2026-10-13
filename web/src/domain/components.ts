@@ -39,9 +39,8 @@ export interface CompDef {
   suffix?: string;     /* 入れ物の節の見出しの末尾(〇〇API など) */
   group: string;       /* 追加ボタンの並び */
   hint?: string;
-  acSuffix?: string;   /* 受け入れ条件の見出しの既定の末尾 */
   defaultName?: string;/* 足したときの見出しの初期値 */
-  ac?: string[];       /* この部品1つにつき作る受け入れ条件(STチケット)。{名前} は見出しの値に置き換わる */
+  ac?: string[];       /* この部品1つにつき作る受け入れ条件(fillAc で値を埋める) */
   fields: FieldDef[];
 }
 
@@ -53,12 +52,14 @@ export const NO_DISPLAY = "表示しない";
 export const NA = "なし";   /* エラーの欄で、該当しないことを表す値 */
 export const NONE = "何もしない";
 export const GROUPS = ["入れ物", "データ操作", "処理"];
+/* 受け入れ条件の既定の文言。見出し(〇〇を取得 など)を「〇〇を取得できること」にする */
+const CAN = "{名前:できる}こと";
 /* STチケットの部品の並び */
 export const ST_GROUPS = ["テスト準備", "テスト実施"];
 
 const t = (id: string, q: string, label: string, extra?: Partial<FieldDef>): FieldDef => ({ id, q, label, kind: "text", ...extra });
 const head = (q: string, ph: string, label = "名前"): FieldDef => t("name", q, label, { head: true, ph });
-const acField = (ph = "空なら見出しをそのまま使う"): FieldDef =>
+const acField = (ph = "空なら「〇〇できること」の形で自動で作る"): FieldDef =>
   t("ac", "受け入れ条件での書き方は？(任意)", "受け入れ条件での書き方", { ac: true, optional: true, ph });
 const cs = (id: string, q: string, label: string): FieldDef => ({ id, q, label, kind: "case" });
 const ls = (id: string, q: string, label: string, ph?: string, extra?: Partial<FieldDef>): FieldDef => ({ id, q, label, kind: "list", ph, ...extra });
@@ -67,6 +68,7 @@ const blocks = (id: string, q: string, label: string, extra?: Partial<FieldDef>)
 export const COMPONENTS: Record<string, CompDef> = {
   api: {
     type: "api", name: "API作成", container: true, suffix: "API", group: "入れ物",
+    ac: ["{名前}APIを呼び出すと、正常時のレスポンスが返ること"],
     hint: "リクエストの形式・必須のチェックは、処理の流れに「チェック」を足して書く。",
     fields: [
       head("APIの名前は？", "例: ファイルアップロード", "API名"),
@@ -87,6 +89,7 @@ export const COMPONENTS: Record<string, CompDef> = {
   },
   screen: {
     type: "screen", name: "画面作成", container: true, suffix: "画面", group: "入れ物",
+    ac: ["{名前}画面が表示されること"],
     fields: [
       head("画面の名前は？", "例: 振込先登録", "画面名"),
       t("screen_id", "画面IDは？", "画面ID"),
@@ -111,6 +114,7 @@ export const COMPONENTS: Record<string, CompDef> = {
   },
   db: {
     type: "db", name: "DB作成", container: true, suffix: "テーブル", group: "入れ物",
+    ac: ["{名前}テーブルが作成されていること"],
     fields: [
       head("テーブル名は？", "例: 書類", "テーブル名"),
       t("purpose", "何を保存する？(用途)", "用途"),
@@ -127,7 +131,7 @@ export const COMPONENTS: Record<string, CompDef> = {
     ]
   },
   check: {
-    type: "check", name: "チェック", group: "処理", acSuffix: "がされていること",
+    type: "check", name: "チェック", group: "処理", ac: ["{名前}がされていること"],
     fields: [
       head("チェック群の名前は？", "例: アップロードファイルの業務チェック"),
       acField("例: ミドルウェアでバリデーションチェックがされていること / 空なら「〇〇がされていること」"),
@@ -139,7 +143,7 @@ export const COMPONENTS: Record<string, CompDef> = {
     ]
   },
   get: {
-    type: "get", name: "取得", group: "データ操作",
+    type: "get", name: "取得", group: "データ操作", ac: [CAN],
     fields: [
       head("何を取得する？", "例: Xをキーにステータスを取得"),
       t("target", "どのDB(テーブル)から？", "取得元"),
@@ -149,7 +153,7 @@ export const COMPONENTS: Record<string, CompDef> = {
     ]
   },
   create: {
-    type: "create", name: "登録", group: "データ操作",
+    type: "create", name: "登録", group: "データ操作", ac: [CAN],
     fields: [
       head("何を登録する？", "例: アップロードした書類の情報を登録"),
       t("target", "どのDB(テーブル)に保存する？", "保存先"),
@@ -160,7 +164,7 @@ export const COMPONENTS: Record<string, CompDef> = {
     ]
   },
   update: {
-    type: "update", name: "更新", group: "データ操作",
+    type: "update", name: "更新", group: "データ操作", ac: [CAN],
     fields: [
       head("何を更新する？", "例: 申込のステータスを更新"),
       t("target", "どのDB(テーブル)を？", "更新先"),
@@ -172,7 +176,7 @@ export const COMPONENTS: Record<string, CompDef> = {
     ]
   },
   delete: {
-    type: "delete", name: "削除", group: "データ操作",
+    type: "delete", name: "削除", group: "データ操作", ac: [CAN],
     fields: [
       head("何を削除する？", "例: 取り下げた書類を削除"),
       t("target", "どのDB(テーブル)から？", "削除元"),
@@ -185,7 +189,7 @@ export const COMPONENTS: Record<string, CompDef> = {
     ]
   },
   auth: {
-    type: "auth", name: "認証", group: "処理",
+    type: "auth", name: "認証", group: "処理", ac: [CAN],
     fields: [
       head("何を確認する？", "例: ログイン中の利用者か確認"),
       t("how", "何で確認する？(トークン、セッションなど)", "確認の方法"),
@@ -196,7 +200,7 @@ export const COMPONENTS: Record<string, CompDef> = {
     ]
   },
   if: {
-    type: "if", name: "条件分岐", group: "処理", hint: "出し分けは、場合ごとに「表示更新」を入れる。",
+    type: "if", name: "条件分岐", group: "処理", hint: "出し分けは、場合ごとに「表示更新」を入れる。", ac: [CAN],
     fields: [
       head("何を確認する？", "例: ステータスを元に編集可否をチェック"),
       acField("例: ステータスによる編集可否のチェックがされていること"),
@@ -204,7 +208,7 @@ export const COMPONENTS: Record<string, CompDef> = {
     ]
   },
   view: {
-    type: "view", name: "表示更新", group: "処理",
+    type: "view", name: "表示更新", group: "処理", ac: [CAN],
     fields: [
       head("何を更新する？", "例: 書類の一覧を更新"),
       t("target", "対象の要素は？", "対象"),
@@ -270,7 +274,7 @@ export const COMPONENTS: Record<string, CompDef> = {
     ]
   },
   do: {
-    type: "do", name: "処理実行", group: "処理", hint: "ほかの部品に当てはまらない処理を書く。",
+    type: "do", name: "処理実行", group: "処理", hint: "ほかの部品に当てはまらない処理を書く。", ac: [CAN],
     fields: [
       head("何をする？", "例: 一時ファイルを削除"),
       t("detail", "詳細は？(任意。1行ごとに箇条書きになる)", "詳細", { optional: true, bare: true }),
@@ -290,6 +294,32 @@ export function newBlock(def: CompDef, key: () => string): Record<string, unknow
     else if (f.kind === "rows" && f.head !== true && def.type === "check") b[f.id] = [{ _k: key() }];
   });
   return b;
+}
+
+/* 見出しを「〜できる」の形にする。「〜する」は「〜できる」に、動詞で終わるならそのまま、名詞で終わるなら「できる」を付ける */
+export function toCan(name: string): string {
+  const s = name.replace(/[。．.]+$/, "");
+  if (!s) return s;
+  if (s.endsWith("できる")) return s;
+  if (s.endsWith("する")) return s.slice(0, -2) + "できる";
+  if ("うくぐすつぬぶむる".includes(s.slice(-1))) return s;
+  return s + "できる";
+}
+
+/* 受け入れ条件の文言の値を埋める。
+   {名前} は見出しの値、{名前:できる} はその「〜できる」の形、{欄の表記} はその欄の値(一覧は「、」でつなぐ)。
+   値が空なら 未記入 の印にする */
+export function fillAc(template: string, def: CompDef, b: Record<string, unknown>, missing: string): string {
+  const str = (x: unknown) => (Array.isArray(x) ? x.map(String).map(s => s.trim()).filter(Boolean).join("、") : typeof x === "string" ? x.trim().split("\n")[0] : "");
+  const hf = def.fields.find(f => f.head);
+  const name = hf ? str(b[hf.id]) : "";
+  return template.replace(/\{([^{}]+)\}/g, (all, key: string) => {
+    if (key === "名前") return name || missing;
+    if (key === "名前:できる") return name ? toCan(name) : missing;
+    const f = def.fields.find(x => x.label === key || x.id === key);
+    if (!f) return all;
+    return str(b[f.id]) || missing;
+  });
 }
 
 /* エラーハンドリングの、処理の流れでの書き方 */

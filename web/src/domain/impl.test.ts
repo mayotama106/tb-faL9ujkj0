@@ -1,6 +1,6 @@
 /* 実装チケット(部品の組み合わせ)。見本のチケット(ファイルアップロード機能の構築)を部品で組み立てて確かめる */
 import { describe, expect, it } from "vitest";
-import { COMPONENTS, NA } from "./components";
+import { COMPONENTS, NA, fillAc, toCan } from "./components";
 import { GENRES } from "./genres";
 import { collectAc } from "./impl";
 import { buildTicket, type Values } from "./ticket";
@@ -99,7 +99,10 @@ const expected = `## ストーリー
    * ファイル存在チェックに引っかかる場合
       * HTTPステータス：400
       * エラーコード：I009-00014
+* Xをキーにステータスを取得できること
+   * 0件の場合、対象なしとして扱うこと
 * ステータスによる編集可否のチェックがされていること
+   * 編集可能な場合、何もしないこと
    * 編集不可の場合
       * HTTPステータス：【未記入】
       * エラーコード：【未記入】
@@ -150,8 +153,9 @@ describe("実装チケット", () => {
       "* リクエストパラメータ", "   * 原典：IF定義書", "* レスポンス(正常時)", "   * 項目と型", "      * id: string"].join("\n"));
     expect(r.text).toContain(["### 処理の流れ", "", "1. ログイン中か確認", "   * 確認の方法：トークン", "2. 書類を登録", "   * 保存先：書類",
       "   * 保存する項目", "      * 種類", "      * ファイル", "   * 同じリクエストが届いた場合：上書きする", "   * 保存に失敗した場合：エラーモーダルを表示"].join("\n"));
-    expect(r.text).toContain(["* ログイン中か確認", "   * 認証できない場合", "      * HTTPステータス：401", "      * エラーコード：E401",
-      "* 書類を登録", "   * 保存に失敗した場合", "      * 表示：モーダル", "      * HTTPステータス：500", "      * エラーコード：E500", "      * エラーメッセージ：保存できません"].join("\n"));
+    expect(r.text).toContain(["* 書類アップロードAPIを呼び出すと、正常時のレスポンスが返ること",
+      "* ログイン中か確認できること", "   * 認証できない場合", "      * HTTPステータス：401", "      * エラーコード：E401",
+      "* 書類を登録できること", "   * 同じリクエストが届いた場合、上書きすること", "   * 保存に失敗した場合", "      * 表示：モーダル", "      * HTTPステータス：500", "      * エラーコード：E500", "      * エラーメッセージ：保存できません"].join("\n"));
     /* 任意の「権限がない場合」は空なので受け入れ条件に出さない */
     expect(r.text).not.toContain("権限がない場合");
   });
@@ -160,7 +164,7 @@ describe("実装チケット", () => {
     const v: Values = { blocks: [{ type: "screen", name: "書類提出", elements: [
       { name: "メールアドレス", kind: "入力", style: "標準", type: "文字列", cond: "常に", bad: { display: "その他", status: NA, code: NA, message: "形式が正しくありません", note: "欄の下に赤字" } }] }] };
     const ac = collectAc(COMPONENTS, v);
-    expect(ac[0].lead).toBe("書類提出画面");
+    expect(ac[0].lead).toBe("書類提出画面が表示されること");
     expect(ac[0].cases[0].label).toBe("メールアドレスの入力が不正な場合");
     const r = buildTicket(GENRES.impl, v);
     expect(r.text).toContain(["   * メールアドレスの入力が不正な場合", "      * 表示：その他", "      * エラーメッセージ：形式が正しくありません", "      * 補足：欄の下に赤字"].join("\n"));
@@ -172,7 +176,9 @@ describe("実装チケット", () => {
       { cond: "足りない", blocks: [{ type: "error", err: { display: "表示しない", status: "409", code: "E002-00001" } }] }] }] });
     expect(r.text).toContain(["1. 残高を確認", "   * 足りる場合", "      * 引き落とす", "      * 履歴を残す",
       "         * 取引IDを付ける", "   * 足りない場合、エラーを返却"].join("\n"));
-    expect(r.text).toContain(["* 残高を確認", "   * 足りない場合", "      * HTTPステータス：409"].join("\n"));
+    expect(r.text).toContain(["* 残高を確認できること", "   * 足りない場合", "      * HTTPステータス：409"].join("\n"));
+    /* 場合の中の部品は、受け入れ条件の頭に「〇〇場合、」を付ける */
+    expect(r.text).toContain(["* 足りる場合、引き落とすこと", "* 足りる場合、履歴を残すこと"].join("\n"));
   });
 
   it("処理実行と条件分岐は、互いに何段でも入れ子にでき、中のエラーも受け入れ条件になる", () => {
@@ -197,13 +203,30 @@ describe("実装チケット", () => {
       "               * NGの場合、エラーを返却",
       "      * 法人の場合、登記を確認する",
       "   2. 確定日時を記録する"].join("\n"));
-    expect(r.text).toContain(["* 確認結果を判定", "   * NGの場合", "      * HTTPステータス：403", "      * エラーコード：E3"].join("\n"));
+    expect(r.text).toContain(["## 受け入れ条件", "", "* 申込を確定できること", "* 申込区分を確認できること",
+      "* 個人の場合、本人確認できること", "* 確認結果を判定できること", "   * OKの場合、何もしないこと",
+      "   * NGの場合", "      * HTTPステータス：403", "      * エラーコード：E3",
+      "* 法人の場合、登記を確認できること", "* 確定日時を記録できること"].join("\n"));
   });
 
   it("部品の定義を編集すると、本文の表記が変わる", () => {
     const defs = { ...COMPONENTS, get: { ...COMPONENTS.get, fields: COMPONENTS.get.fields.map(f => f.id === "target" ? { ...f, label: "参照テーブル" } : f) } };
     const r = buildTicket(GENRES.impl, { proc_name: "x", blocks: [{ type: "get", name: "取得", target: "申込" }] }, defs);
     expect(r.text).toContain("   * 参照テーブル：申込");
+  });
+});
+
+describe("部品の受け入れ条件の文言", () => {
+  it("見出しを「〜できる」の形にする", () => {
+    expect(toCan("Xをキーにステータスを取得")).toBe("Xをキーにステータスを取得できる");
+    expect(toCan("本人確認する")).toBe("本人確認できる");
+    expect(toCan("空の一覧を返す")).toBe("空の一覧を返す");
+    expect(toCan("登録できる")).toBe("登録できる");
+  });
+  it("欄の表記で、その欄の値を埋められる", () => {
+    const def = { ...COMPONENTS.get, ac: ["{取得元}から{条件}をキーに取得できること"] };
+    expect(fillAc(def.ac[0], def, { name: "x", target: "申込", cond: "申込ID" }, "【未記入】")).toBe("申込から申込IDをキーに取得できること");
+    expect(fillAc(def.ac[0], def, { name: "x" }, "【未記入】")).toBe("【未記入】から【未記入】をキーに取得できること");
   });
 });
 
