@@ -175,6 +175,31 @@ describe("実装チケット", () => {
     expect(r.text).toContain(["* 残高を確認", "   * 足りないの場合", "      * HTTPステータス：409"].join("\n"));
   });
 
+  it("処理実行と条件分岐は、互いに何段でも入れ子にでき、中のエラーも受け入れ条件になる", () => {
+    const r = buildTicket(GENRES.impl, { proc_name: "申込", blocks: [
+      { type: "do", name: "申込を確定する", kids: [
+        { type: "if", name: "申込区分を確認", cases: [
+          { cond: "個人", blocks: [
+            { type: "do", name: "本人確認する", detail: "マイナンバーで確認", kids: [
+              { type: "if", name: "確認結果を判定", cases: [
+                { cond: "OK", none: true, blocks: [] },
+                { cond: "NG", blocks: [{ type: "error", err: { display: "表示しない", status: "403", code: "E3" } }] }] }] }] },
+          { cond: "法人", blocks: [{ type: "do", name: "登記を確認する" }] }] },
+        { type: "do", name: "確定日時を記録する" }] }] });
+    expect(r.text).toContain([
+      "1. 申込を確定する",
+      "   1. 申込区分を確認",
+      "      * 個人であれば",
+      "         * 本人確認する",
+      "            * マイナンバーで確認",
+      "            1. 確認結果を判定",
+      "               * OKであれば何もしない",
+      "               * NGであればエラーを返却",
+      "      * 法人であれば登記を確認する",
+      "   2. 確定日時を記録する"].join("\n"));
+    expect(r.text).toContain(["* 確認結果を判定", "   * NGの場合", "      * HTTPステータス：403", "      * エラーコード：E3"].join("\n"));
+  });
+
   it("部品の定義を編集すると、本文の表記が変わる", () => {
     const defs = { ...COMPONENTS, get: { ...COMPONENTS.get, fields: COMPONENTS.get.fields.map(f => f.id === "target" ? { ...f, label: "参照テーブル" } : f) } };
     const r = buildTicket(GENRES.impl, { proc_name: "x", blocks: [{ type: "get", name: "取得", target: "申込" }] }, defs);

@@ -273,7 +273,9 @@ export const COMPONENTS: Record<string, CompDef> = {
     type: "do", name: "処理実行", group: "処理", hint: "ほかの部品に当てはまらない処理を書く。",
     fields: [
       head("何をする？", "例: 一時ファイルを削除"),
-      t("detail", "詳細は？(任意。1行ごとに箇条書きになる)", "詳細", { optional: true, bare: true })
+      t("detail", "詳細は？(任意。1行ごとに箇条書きになる)", "詳細", { optional: true, bare: true }),
+      /* 中の処理。処理実行と条件分岐は、互いに何段でも入れ子にできる */
+      blocks("kids", "中の処理は？(任意。処理実行・条件分岐などを入れ子にする)", "中の処理", { optional: true, bare: true })
     ]
   }
 };

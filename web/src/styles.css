@@ -312,3 +312,5 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
 .tpl-tabs .chip { padding: 3px 12px; font-size: 13px; }
 .ac-auto { margin: 6px 0 0; padding-left: 20px; }
 .ac-auto li { margin: 2px 0; }
+.pal-open { display: block; }
+.pal-close { align-self: flex-end; font-size: 12px; margin-top: 2px; }

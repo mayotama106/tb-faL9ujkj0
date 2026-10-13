@@ -124,6 +124,8 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
       case "blocks": {
         const items = arr(val);
         if (!items.length) return empty();
+        /* bare なら表記の行を出さず、中の部品を番号付きでそのまま並べる */
+        if (f.bare) return blockLines(items, d, true);
         return [bullet(d, f.label)].concat(blockLines(items, d + 1, true));
       }
       case "rows": {
@@ -155,7 +157,7 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
       const one = bs[0];
       if (bs.length === 1 && one.type === "error" && !t(one.when) && !t((one.err || {}).note))
         return [bullet(d, label + "であれば" + errorHead(one.err))];
-      if (bs.length === 1 && one.type === "do" && !t(one.detail) && linesOf(one.name).length === 1)
+      if (bs.length === 1 && one.type === "do" && !t(one.detail) && !arr(one.kids).length && linesOf(one.name).length === 1)
         return [bullet(d, label + "であれば" + t(one.name))];
       return [bullet(d, label + "であれば")].concat(blockLines(bs, d + 1, false));
     });

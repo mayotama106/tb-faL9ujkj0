@@ -47,15 +47,9 @@ function oldSteps(steps: unknown): Values[] {
       const e = oldErr(st); e.note = joinLines(e.note, st.note);
       return { _k: key(), type: "error", when: "", err: e };
     }
-    const kids = arr(st.kids);
-    const block: Values = { _k: key(), type: "do", name: s(st.text), detail: s(st.note) };
-    /* 子の工程は、処理実行の詳細に1行ずつ残す */
-    if (kids.length) block.detail = joinLines(block.detail, ...flatTexts(kids));
-    return block;
+    /* 子の工程は、処理実行の中の処理として入れ子のまま移す */
+    return { _k: key(), type: "do", name: s(st.text), detail: s(st.note), kids: oldSteps(st.kids) };
   });
-}
-function flatTexts(steps: Values[]): string[] {
-  return steps.flatMap(st => [s(st.text), ...flatTexts(arr(st.kids)), ...flatTexts(arr(st.then)), ...flatTexts(arr(st.else))]).filter(Boolean);
 }
 
 /* 処理の流れの形式(チェック群・処理実行・条件分岐・エラーを返却)の工程 */
