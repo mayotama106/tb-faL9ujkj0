@@ -53,17 +53,31 @@ function EdField({ label, value, onChange, ph }: { label: string; value: string;
   );
 }
 
+/* 編集中のもの(ジャンル、または comp:部品の種類)が属するジャンル。部品はその並びで決まる */
+export function genreOfSel(sel: string, defs: Record<string, CompDef>): string {
+  if (!sel.startsWith("comp:")) return sel;
+  const def = defs[sel.slice(5)];
+  return def && ST_GROUPS.includes(def.group) ? "st" : "impl";
+}
+
 export function TemplateEditor() {
   const sel = useStore(s => s.ui.editGenre);
   const defs = useStore(s => defsOf(s.data));
+  const genre = genreOfSel(sel, defs);
+  /* ジャンル(実装・ST・バグ)を選び、その下に、そのジャンルの本文の構成と部品を並べる */
+  const groups = GENRES[genre]?.st ? ST_GROUPS : GENRES[genre]?.impl ? GROUPS : [];
   const tabs = (
     <div className="tpl-tabs">
-      <div className="genres" role="group" aria-label="編集するジャンル">
+      <div className="genres" role="group" aria-label="編集するチケットの種類">
         {Object.keys(GENRES).map(k => (
-          <button key={k} type="button" className="genre" aria-pressed={k === sel} onClick={() => setUI({ editGenre: k })}>{GENRES[k].name}</button>
+          <button key={k} type="button" className="genre" aria-pressed={k === genre} onClick={() => setUI({ editGenre: k })}>{GENRES[k].name}</button>
         ))}
       </div>
-      {GROUPS.concat(ST_GROUPS).map(gr => (
+      {groups.length > 0 && <div className="pal-row">
+        <span className="pal-g">本文</span>
+        <button type="button" className="chip" aria-pressed={sel === genre} onClick={() => setUI({ editGenre: genre })}>本文の構成</button>
+      </div>}
+      {groups.map(gr => (
         <div key={gr} className="pal-row" role="group" aria-label={"部品: " + gr}>
           <span className="pal-g">部品: {gr}</span>
           {Object.values(defs).filter(d => d.group === gr).map(d => (
@@ -99,7 +113,7 @@ function GenreEditor({ genre }: { genre: string }) {
         {g.st ? <>
           {([["overview", "実施概要"], ["content", "内容"], ["schedule", "スケジュール"], ["steps", "実施手順"], ["ac", "受け入れ条件"]] as const)
             .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
-          <p className="hint">実施手順の部品と、部品ごとの受け入れ条件の文言は、上の「部品: テスト準備 / テスト実施」から編集する。</p>
+          <p className="hint">実施手順の部品と、部品ごとの受け入れ条件の文言は、上の「部品」から選んで編集する。</p>
         </> : g.impl ? <>
           {([["story", "ストーリー"], ["scope", "スコープ"], ["scopeIn", "スコープ内"], ["scopeOut", "スコープ外"], ["flowSuffix", "処理の見出しの末尾(〇〇処理)"], ["flowTitle", "処理の流れ"], ["ac", "受け入れ条件"],
             ["okCase", "受け入れ条件の正常時の書き方"], ["notes", "制約事項・技術的補足"], ["branch", "ブランチ"],

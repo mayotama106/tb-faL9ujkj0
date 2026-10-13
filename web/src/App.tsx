@@ -5,7 +5,7 @@ import { createDoc, goPart } from "./state/actions";
 import { currentDoc, defsOf, genreOf, redo, setUI, undo, useStore } from "./state/store";
 import { Preview } from "./components/Preview";
 import { Sidebar } from "./components/Sidebar";
-import { TemplateEditor } from "./components/TemplateEditor";
+import { TemplateEditor, genreOfSel } from "./components/TemplateEditor";
 import { Wizard } from "./components/Wizard";
 
 const EMPTY = {};
@@ -34,7 +34,7 @@ export function App() {
 
   /* プレビューに出すチケット。テンプレートの編集中は、編集中のジャンルで作る */
   /* 部品の編集中(comp:種類)は、実装チケットで作る */
-  const previewGenre = editing ? (editGenre.startsWith("comp:") ? "impl" : editGenre) : doc ? doc.genre : null;
+  const previewGenre = editing ? genreOfSel(editGenre, defsOf(data)) : doc ? doc.genre : null;
   const g = previewGenre ? genreOf(data, previewGenre) : null;
   const v = doc && doc.genre === previewGenre ? doc.v : EMPTY;
   const defs = defsOf(data);
