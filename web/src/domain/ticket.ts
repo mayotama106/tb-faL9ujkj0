@@ -2,6 +2,7 @@
    旧版 index.html の buildTicket を移したもの。本文はパートごとのブロックに分けて返す */
 import type { CompDef } from "./components";
 import { buildImplTicket } from "./impl";
+import { buildStTicket } from "./st";
 import { HAS, HAS_NOT, LOGIC_SRC, MISSING, MOD, NEW, REF, type Genre, type Heads, type QNode } from "./genres";
 
 /* 入力値。キーは問いのID(と、その派生) */
@@ -15,7 +16,8 @@ export const HEADS: Heads = {
   leadNew: "{名前}が新規作成されていること", leadMod: "{名前}が改修されていること",
   flowSuffix: "処理", flowTitle: "処理の流れ", notes: "制約事項・技術的補足", branch: "ブランチ",
   call: "呼び出し条件", impact: "既存影響", okCase: "正常に処理が完了した場合",
-  scope: "スコープ", scopeIn: "スコープ内", scopeOut: "スコープ外"
+  scope: "スコープ", scopeIn: "スコープ内", scopeOut: "スコープ外",
+  overview: "実施概要", content: "内容", schedule: "スケジュール", steps: "実施手順"
 };
 export const headsOf = (g: Genre): Heads => Object.assign({}, HEADS, g.heads || {});
 
@@ -49,6 +51,7 @@ type Depth = number | string[];
 /* defs は実装チケットの部品の定義(テンプレートの編集を反映したもの)。省略すると初期の定義 */
 export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, CompDef>): Ticket {
   if (g.impl) return buildImplTicket(g, v, defs);
+  if (g.st) return buildStTicket(g, v, defs);
   const h = headsOf(g);
   const sparseAll = v.mod === MOD;   /* 既存改修は、記載のある項目だけを出力する */
   let missing = 0;

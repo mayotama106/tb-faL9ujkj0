@@ -4,7 +4,7 @@ import { current, isDraft, type Draft } from "immer";
 import { useId, useState } from "react";
 import { GENRES, type Genre, type Heads, type QNode } from "../domain/genres";
 import { headsOf } from "../domain/ticket";
-import { COMPONENTS, GROUPS, type CompDef, type FieldDef } from "../domain/components";
+import { COMPONENTS, GROUPS, ST_GROUPS, type CompDef, type FieldDef } from "../domain/components";
 import { defsOf, genreOf, getAt, newId, setUI, toast, update, useStore } from "../state/store";
 import { AutoText, Kids } from "./Fields";
 import { SortableList, move } from "./Sortable";
@@ -63,7 +63,7 @@ export function TemplateEditor() {
           <button key={k} type="button" className="genre" aria-pressed={k === sel} onClick={() => setUI({ editGenre: k })}>{GENRES[k].name}</button>
         ))}
       </div>
-      {GROUPS.map(gr => (
+      {GROUPS.concat(ST_GROUPS).map(gr => (
         <div key={gr} className="pal-row" role="group" aria-label={"部品: " + gr}>
           <span className="pal-g">部品: {gr}</span>
           {Object.values(defs).filter(d => d.group === gr).map(d => (
@@ -96,7 +96,11 @@ function GenreEditor({ genre }: { genre: string }) {
       </section>
       <section className="card">
         <h2>本文の構成</h2>
-        {g.impl ? <>
+        {g.st ? <>
+          {([["overview", "実施概要"], ["content", "内容"], ["schedule", "スケジュール"], ["steps", "実施手順"], ["ac", "受け入れ条件"]] as const)
+            .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
+          <p className="hint">実施手順の部品と、部品ごとの受け入れ条件の文言は、上の「部品: テスト準備 / テスト実施」から編集する。</p>
+        </> : g.impl ? <>
           {([["story", "ストーリー"], ["scope", "スコープ"], ["scopeIn", "スコープ内"], ["scopeOut", "スコープ外"], ["flowSuffix", "処理の見出しの末尾(〇〇処理)"], ["flowTitle", "処理の流れ"], ["ac", "受け入れ条件"],
             ["okCase", "受け入れ条件の正常時の書き方"], ["notes", "制約事項・技術的補足"], ["branch", "ブランチ"],
             ["call", "呼び出し条件"], ["nonfunc", "非機能要件"], ["impact", "既存影響"]] as const)
@@ -117,10 +121,10 @@ function GenreEditor({ genre }: { genre: string }) {
           <EdField label="受け入れ条件の1行目(既存改修)" value={h.leadMod} onChange={setHead("leadMod")} />
           <p className="hint">{"{名前}"} は、名前欄の値と「{g.noun}」に置き換わる。</p>
         </>}
-        {(g.impl ? [["deps", "依存関係"]] as const : [["deps", "依存関係・環境"], ["refs", "参考情報"]] as const)
+        {(g.st ? [] as const : g.impl ? [["deps", "依存関係"]] as const : [["deps", "依存関係・環境"], ["refs", "参考情報"]] as const)
           .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
       </section>
-      {g.impl ? null : g.sections ? g.sections.map((sec, i) => (
+      {g.impl || g.st ? null : g.sections ? g.sections.map((sec, i) => (
         <section className="card" key={sec.key}><h2>問い: {sec.title}</h2><EdList genre={genre} path={["sections", i, "nodes"]} /></section>
       )) : <>
         <section className="card"><h2>問い: {h.func}</h2><EdList genre={genre} path={["func"]} /></section>
@@ -199,12 +203,12 @@ function EdNode({ genre, path, index, handle }: { genre: string; path: Path; ind
 }
 
 /* 選択肢の編集欄。入力中の空行は残し、保存するときだけ空行を除く */
-function OptionsField({ options, onChange }: { options: string[]; onChange: (opts: string[]) => void }) {
+function OptionsField({ options, onChange, label = "選択肢(1行に1つ)" }: { options: string[]; onChange: (opts: string[]) => void; label?: string }) {
   const [raw, setRaw] = useState(options.join("\n"));
   const clean = (s: string) => s.split("\n").map(x => x.trim()).filter(Boolean);
   /* 取り消しなどで外から変わった場合は、表示を合わせる */
   const shown = clean(raw).join("\n") === options.join("\n") ? raw : options.join("\n");
-  return <EdField label="選択肢(1行に1つ)" value={shown} onChange={s => { setRaw(s); onChange(clean(s)); }} />;
+  return <EdField label={label} value={shown} onChange={s => { setRaw(s); onChange(clean(s)); }} />;
 }
 
 /* ===== 部品の編集 =====
@@ -231,6 +235,10 @@ function CompEditor({ type }: { type: string }) {
       {def.container && <EdField label="本文の節の見出しの末尾(〇〇API など)" value={def.suffix || ""}
         onChange={val => editComp(type, d => { d.suffix = val; }, "suffix")} />}
       <EdField label="入力画面に出す説明(任意)" value={def.hint || ""} onChange={val => editComp(type, d => { d.hint = val || undefined; }, "hint")} />
+      {def.defaultName != null && <EdField label="足したときの手順の名前(初期値)" value={def.defaultName}
+        onChange={val => editComp(type, d => { d.defaultName = val; }, "defaultName")} />}
+      {def.ac && <OptionsField label="この手順から作る受け入れ条件(1行に1つ。{名前} は手順の名前に置き換わる)" options={def.ac}
+        onChange={lines => editComp(type, d => { d.ac = lines; }, "ac")} />}
       <button type="button" className="plain" disabled={!edited} onClick={() => {
         update(d => { delete d.comps[type]; });
         toast("部品「" + COMPONENTS[type].name + "」を初期状態に戻した", true);

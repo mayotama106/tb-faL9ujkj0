@@ -40,6 +40,8 @@ export interface CompDef {
   group: string;       /* 追加ボタンの並び */
   hint?: string;
   acSuffix?: string;   /* 受け入れ条件の見出しの既定の末尾 */
+  defaultName?: string;/* 足したときの見出しの初期値 */
+  ac?: string[];       /* この部品1つにつき作る受け入れ条件(STチケット)。{名前} は見出しの値に置き換わる */
   fields: FieldDef[];
 }
 
@@ -51,6 +53,8 @@ export const NO_DISPLAY = "表示しない";
 export const NA = "なし";   /* エラーの欄で、該当しないことを表す値 */
 export const NONE = "何もしない";
 export const GROUPS = ["入れ物", "データ操作", "処理"];
+/* STチケットの部品の並び */
+export const ST_GROUPS = ["テスト準備", "テスト実施"];
 
 const t = (id: string, q: string, label: string, extra?: Partial<FieldDef>): FieldDef => ({ id, q, label, kind: "text", ...extra });
 const head = (q: string, ph: string, label = "名前"): FieldDef => t("name", q, label, { head: true, ph });
@@ -215,6 +219,33 @@ export const COMPONENTS: Record<string, CompDef> = {
       { id: "err", q: "エラーの内容は？", label: "エラー", kind: "error" }
     ]
   },
+  /* ===== STチケットの部品(実施手順) ===== */
+  st_case: {
+    type: "st_case", name: "テストケース準備", group: "テスト準備", defaultName: "テストケース準備",
+    ac: ["テストケースが準備され、格納されていること"],
+    fields: [
+      head("手順の名前は？", "例: テストケース準備"),
+      t("scenario", "テストシナリオのリンクは？", "テストシナリオ"),
+      t("store", "テストケースの格納先のリンクは？", "テストケース格納先")
+    ]
+  },
+  st_account: {
+    type: "st_account", name: "アカウント準備", group: "テスト準備", defaultName: "アカウント準備",
+    ac: ["テスト用のアカウントが準備され、アカウント情報が格納されていること"],
+    fields: [
+      head("手順の名前は？", "例: アカウント準備"),
+      t("store", "アカウント情報の格納先のリンクは？", "アカウント情報格納先")
+    ]
+  },
+  st_exec: {
+    type: "st_exec", name: "打鍵", group: "テスト実施", defaultName: "テストケースに沿った打鍵",
+    ac: ["{名前}が完了し、証跡が格納されていること"],
+    fields: [
+      head("手順の名前は？", "例: テストケースに沿った打鍵"),
+      t("cases", "元にするテストケースのリンクは？", "テストケース"),
+      t("proof", "証跡の格納先のリンクは？", "証跡格納先")
+    ]
+  },
   do: {
     type: "do", name: "処理実行", group: "処理", hint: "ほかの部品に当てはまらない処理を書く。",
     fields: [
@@ -227,6 +258,8 @@ export const COMPONENTS: Record<string, CompDef> = {
 /* 部品の値を新しく作る */
 export function newBlock(def: CompDef, key: () => string): Record<string, unknown> {
   const b: Record<string, unknown> = { _k: key(), type: def.type };
+  const hf = def.fields.find(f => f.head);
+  if (hf && def.defaultName) b[hf.id] = def.defaultName;
   def.fields.forEach(f => {
     if (f.kind === "branches") b[f.id] = [{ _k: key(), cond: "", blocks: [] }, { _k: key(), cond: "", blocks: [] }];
     else if (f.kind === "rows" && f.head !== true && def.type === "check") b[f.id] = [{ _k: key() }];

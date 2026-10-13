@@ -29,6 +29,8 @@ export interface Heads {
   flowSuffix: string; flowTitle: string; notes: string; branch: string;
   call: string; impact: string; okCase: string;
   scope: string; scopeIn: string; scopeOut: string;
+  /* STチケットで使う見出し */
+  overview: string; content: string; schedule: string; steps: string;
 }
 
 export interface Genre {
@@ -44,6 +46,7 @@ export interface Genre {
   sections?: Section[];
   heads?: Partial<Heads>;
   impl?: boolean;   /* 実装チケット。部品を組み合わせて作り、観点表(func など)を持たない */
+  st?: boolean;     /* STチケット。実施手順を部品で組み立て、受け入れ条件は手順から作る */
 }
 
 export const MISSING = "【未記入】";
@@ -63,6 +66,10 @@ export const GENRES: Record<string, Genre> = {
     name: "実装チケット",
     impl: true,
     heads: { deps: "依存関係" }
+  },
+  st: {
+    name: "STチケット",
+    st: true
   },
   /* 不具合の報告と修正。作成区分を持たず、節の構成が他のジャンルと異なる */
   bug: {

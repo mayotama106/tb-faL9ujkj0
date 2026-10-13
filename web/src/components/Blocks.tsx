@@ -24,11 +24,11 @@ function Del({ label, onClick }: { label: string; onClick: () => void }) {
 }
 
 /* 部品の追加ボタン。入れ物はチケットの直下にだけ置ける */
-function Palette({ top, onAdd }: { top: boolean; onAdd: (def: CompDef) => void }) {
+function Palette({ top, groups, onAdd }: { top: boolean; groups: string[]; onAdd: (def: CompDef) => void }) {
   const defs = useDefs();
   return (
     <div className="palette">
-      {GROUPS.filter(g => top || g !== "入れ物").map(g => (
+      {groups.filter(g => top || g !== "入れ物").map(g => (
         <div key={g} className="pal-row">
           <span className="pal-g">{g}</span>
           {Object.values(defs).filter(d => d.group === g).map(d => (
@@ -39,10 +39,11 @@ function Palette({ top, onAdd }: { top: boolean; onAdd: (def: CompDef) => void }
     </div>
   );
 }
-const groupClass = (g: string) => (g === "入れ物" ? "box" : g === "データ操作" ? "data" : "proc");
+const groupClass = (g: string) => (g === "入れ物" || g === "テスト準備" ? "box" : g === "データ操作" || g === "テスト実施" ? "data" : "proc");
 
 /* 部品の並び。top はチケットの直下 */
-export function BlockList({ path, top }: { path: Path; top?: boolean }) {
+/* groups は追加ボタンに出す部品の並び(実装チケットは GROUPS、STチケットは ST_GROUPS) */
+export function BlockList({ path, top, groups = GROUPS }: { path: Path; top?: boolean; groups?: string[] }) {
   const defs = useDefs();
   const arr: Values[] = useVAt(path) || [];
   const ids = arr.map((b, i) => b._k || "i" + i);
@@ -57,7 +58,7 @@ export function BlockList({ path, top }: { path: Path; top?: boolean }) {
       <SortableList ids={ids} onMove={(f, to) => editDoc(v => move(arrayAt(v, path), f, to))}>
         {(_id, i, handle) => <BlockView path={path} index={i} handle={handle} numbered={!!top || !defs[arr[i]?.type]?.container} />}
       </SortableList>
-      <Palette top={!!top} onAdd={add} />
+      <Palette top={!!top} groups={groups} onAdd={add} />
     </div>
   );
 }
