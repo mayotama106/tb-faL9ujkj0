@@ -28,8 +28,8 @@ const sample: Values = {
       chk("ファイル存在チェック", be("400", "I009-00014"))] },
     { type: "get", name: "Xをキーにステータスを取得", target: "申込", cond: "申込ID", zero: { mode: "text", text: "対象なしとして扱う" } },
     { type: "if", name: "ステータスを元に編集可否をチェック", ac: "ステータスによる編集可否のチェックがされていること", cases: [
-      { cond: "編集可能", none: true, blocks: [] },
-      { cond: "編集不可", blocks: [{ type: "error", err: be() }] }] }
+      { cond: "編集可能な", none: true, blocks: [] },
+      { cond: "編集不可の", blocks: [{ type: "error", err: be() }] }] }
   ],
   deps: ["正式資材受領は11/17予定\nデザイン対応計画リンク"],
   branch: "開発ブランチはX面\nブランチ反映予定リンク"
@@ -68,7 +68,7 @@ const expected = `## ストーリー
    * 条件：申込ID
    * 0件の場合：対象なしとして扱う
 4. ステータスを元に編集可否をチェック
-   * 編集可能の場合、何もしない
+   * 編集可能な場合、何もしない
    * 編集不可の場合、エラーを返却
 
 ## 受け入れ条件
@@ -170,21 +170,21 @@ describe("実装チケット", () => {
     const r = buildTicket(GENRES.impl, { proc_name: "引き落とし", blocks: [{ type: "if", name: "残高を確認", cases: [
       { cond: "足りる", blocks: [{ type: "do", name: "引き落とす" }, { type: "do", name: "履歴を残す", detail: "取引IDを付ける" }] },
       { cond: "足りない", blocks: [{ type: "error", err: { display: "表示しない", status: "409", code: "E002-00001" } }] }] }] });
-    expect(r.text).toContain(["1. 残高を確認", "   * 足りるの場合", "      * 引き落とす", "      * 履歴を残す",
-      "         * 取引IDを付ける", "   * 足りないの場合、エラーを返却"].join("\n"));
-    expect(r.text).toContain(["* 残高を確認", "   * 足りないの場合", "      * HTTPステータス：409"].join("\n"));
+    expect(r.text).toContain(["1. 残高を確認", "   * 足りる場合", "      * 引き落とす", "      * 履歴を残す",
+      "         * 取引IDを付ける", "   * 足りない場合、エラーを返却"].join("\n"));
+    expect(r.text).toContain(["* 残高を確認", "   * 足りない場合", "      * HTTPステータス：409"].join("\n"));
   });
 
   it("処理実行と条件分岐は、互いに何段でも入れ子にでき、中のエラーも受け入れ条件になる", () => {
     const r = buildTicket(GENRES.impl, { proc_name: "申込", blocks: [
       { type: "do", name: "申込を確定する", kids: [
         { type: "if", name: "申込区分を確認", cases: [
-          { cond: "個人", blocks: [
+          { cond: "個人の", blocks: [
             { type: "do", name: "本人確認する", detail: "マイナンバーで確認", kids: [
               { type: "if", name: "確認結果を判定", cases: [
-                { cond: "OK", none: true, blocks: [] },
-                { cond: "NG", blocks: [{ type: "error", err: { display: "表示しない", status: "403", code: "E3" } }] }] }] }] },
-          { cond: "法人", blocks: [{ type: "do", name: "登記を確認する" }] }] },
+                { cond: "OKの", none: true, blocks: [] },
+                { cond: "NGの", blocks: [{ type: "error", err: { display: "表示しない", status: "403", code: "E3" } }] }] }] }] },
+          { cond: "法人の", blocks: [{ type: "do", name: "登記を確認する" }] }] },
         { type: "do", name: "確定日時を記録する" }] }] });
     expect(r.text).toContain([
       "1. 申込を確定する",
@@ -215,9 +215,9 @@ describe("旧形式からの引き継ぎ", () => {
   it("処理の流れの形式(ロジック作成)を部品に移すと、同じ本文になる", () => {
     const old: Values = { _flow: 1, title: "t", story_goal: "g", proc_name: "p", flow: [
       { kind: "checks", text: "チェック", ac: "", items: [{ name: "a", detail: "", status: "400", code: "E1" }] },
-      { kind: "if", text: "分岐", yes: "可", no: "不可", thenNone: true, then: [], else: [{ kind: "error", status: "403", code: "E2" }] }] };
+      { kind: "if", text: "分岐", yes: "可能な", no: "不可の", thenNone: true, then: [], else: [{ kind: "error", status: "403", code: "E2" }] }] };
     const r = buildTicket(GENRES.impl, toImpl("logic", old));
-    expect(r.text).toContain(["1. チェック", "   * a", "2. 分岐", "   * 可の場合、何もしない", "   * 不可の場合、エラーを返却"].join("\n"));
+    expect(r.text).toContain(["1. チェック", "   * a", "2. 分岐", "   * 可能な場合、何もしない", "   * 不可の場合、エラーを返却"].join("\n"));
     expect(r.text).toContain(["* チェックがされていること", "   * aに引っかかる場合", "      * HTTPステータス：400", "      * エラーコード：E1"].join("\n"));
   });
   it("API作成の観点表を、API作成の部品とデータ操作の部品に移す", () => {

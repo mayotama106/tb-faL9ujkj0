@@ -64,7 +64,7 @@ export function collectAc(defs: Defs, v: Values): AcGroup[] {
         walk(o[f.id], [...op, f.id], rowName && rowName !== MISSING ? rowName : lead);
       } else if (f.kind === "branches") {
         arr(o[f.id]).forEach((c, j) => {
-          if (!c.none) walk(c.blocks, [...op, f.id, j, "blocks"], lead, (t(c.cond) || MISSING) + "の場合");
+          if (!c.none) walk(c.blocks, [...op, f.id, j, "blocks"], lead, (t(c.cond) || MISSING) + "場合");
         });
       }
     });
@@ -145,21 +145,21 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
     return [];
   }
 
-  /* 条件分岐の場合ごと。1つの部品で1行に収まるなら「〇〇の場合、△△」と1行で書く */
+  /* 条件分岐の場合ごと。1つの部品で1行に収まるなら「〇〇場合、△△」と1行で書く */
   function branchLines(cases: unknown, d: number): string[] {
     const cs = arr(cases);
     if (!cs.length) return [bullet(d, miss())];
     return cs.flatMap(c => {
       const label = req(c.cond);
-      if (c.none) return [bullet(d, label + "の場合、" + NONE)];
+      if (c.none) return [bullet(d, label + "場合、" + NONE)];
       const bs = arr(c.blocks);
-      if (!bs.length) return [bullet(d, label + "の場合、" + miss())];
+      if (!bs.length) return [bullet(d, label + "場合、" + miss())];
       const one = bs[0];
       if (bs.length === 1 && one.type === "error" && !t(one.when) && !t((one.err || {}).note))
-        return [bullet(d, label + "の場合、" + errorHead(one.err))];
+        return [bullet(d, label + "場合、" + errorHead(one.err))];
       if (bs.length === 1 && one.type === "do" && !t(one.detail) && !arr(one.kids).length && linesOf(one.name).length === 1)
-        return [bullet(d, label + "の場合、" + t(one.name))];
-      return [bullet(d, label + "の場合")].concat(blockLines(bs, d + 1, false));
+        return [bullet(d, label + "場合、" + t(one.name))];
+      return [bullet(d, label + "場合")].concat(blockLines(bs, d + 1, false));
     });
   }
 

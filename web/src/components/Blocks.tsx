@@ -280,8 +280,8 @@ function BranchesView({ f, path }: { f: FieldDef; path: Path }) {
       {cases.map((c, i) => (
         <div className="branch-box" key={c._k || i}>
           <div className="row">
-            <div className="grow"><Field path={[...path, i, "cond"]} label={"場合 " + (i + 1) + "の条件は？(「〇〇の場合」の〇〇)"}
-              ph={i === 0 ? "例: 編集可能" : "例: 編集不可"} /></div>
+            <div className="grow"><Field path={[...path, i, "cond"]} label={"場合 " + (i + 1) + "の条件は？(「〇〇場合」の〇〇。例: 編集可能な、編集不可の)"}
+              ph={i === 0 ? "例: 編集可能な" : "例: 編集不可の"} /></div>
             {cases.length > 1 && <Del label={"場合 " + (i + 1) + " を削除"} onClick={() => {
               editDoc(v => { arrayAt(v, path).splice(i, 1); });
               toast("場合を削除した", true);
