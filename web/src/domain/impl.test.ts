@@ -68,8 +68,8 @@ const expected = `## ストーリー
    * 条件：申込ID
    * 0件の場合：対象なしとして扱う
 4. ステータスを元に編集可否をチェック
-   * 編集可能であれば何もしない
-   * 編集不可であればエラーを返却
+   * 編集可能の場合何もしない
+   * 編集不可の場合エラーを返却
 
 ## 受け入れ条件
 
@@ -170,8 +170,8 @@ describe("実装チケット", () => {
     const r = buildTicket(GENRES.impl, { proc_name: "引き落とし", blocks: [{ type: "if", name: "残高を確認", cases: [
       { cond: "足りる", blocks: [{ type: "do", name: "引き落とす" }, { type: "do", name: "履歴を残す", detail: "取引IDを付ける" }] },
       { cond: "足りない", blocks: [{ type: "error", err: { display: "表示しない", status: "409", code: "E002-00001" } }] }] }] });
-    expect(r.text).toContain(["1. 残高を確認", "   * 足りるであれば", "      * 引き落とす", "      * 履歴を残す",
-      "         * 取引IDを付ける", "   * 足りないであればエラーを返却"].join("\n"));
+    expect(r.text).toContain(["1. 残高を確認", "   * 足りるの場合", "      * 引き落とす", "      * 履歴を残す",
+      "         * 取引IDを付ける", "   * 足りないの場合エラーを返却"].join("\n"));
     expect(r.text).toContain(["* 残高を確認", "   * 足りないの場合", "      * HTTPステータス：409"].join("\n"));
   });
 
@@ -189,13 +189,13 @@ describe("実装チケット", () => {
     expect(r.text).toContain([
       "1. 申込を確定する",
       "   1. 申込区分を確認",
-      "      * 個人であれば",
+      "      * 個人の場合",
       "         * 本人確認する",
       "            * マイナンバーで確認",
       "            1. 確認結果を判定",
-      "               * OKであれば何もしない",
-      "               * NGであればエラーを返却",
-      "      * 法人であれば登記を確認する",
+      "               * OKの場合何もしない",
+      "               * NGの場合エラーを返却",
+      "      * 法人の場合登記を確認する",
       "   2. 確定日時を記録する"].join("\n"));
     expect(r.text).toContain(["* 確認結果を判定", "   * NGの場合", "      * HTTPステータス：403", "      * エラーコード：E3"].join("\n"));
   });
@@ -217,7 +217,7 @@ describe("旧形式からの引き継ぎ", () => {
       { kind: "checks", text: "チェック", ac: "", items: [{ name: "a", detail: "", status: "400", code: "E1" }] },
       { kind: "if", text: "分岐", yes: "可", no: "不可", thenNone: true, then: [], else: [{ kind: "error", status: "403", code: "E2" }] }] };
     const r = buildTicket(GENRES.impl, toImpl("logic", old));
-    expect(r.text).toContain(["1. チェック", "   * a", "2. 分岐", "   * 可であれば何もしない", "   * 不可であればエラーを返却"].join("\n"));
+    expect(r.text).toContain(["1. チェック", "   * a", "2. 分岐", "   * 可の場合何もしない", "   * 不可の場合エラーを返却"].join("\n"));
     expect(r.text).toContain(["* チェックがされていること", "   * aに引っかかる場合", "      * HTTPステータス：400", "      * エラーコード：E1"].join("\n"));
   });
   it("API作成の観点表を、API作成の部品とデータ操作の部品に移す", () => {
