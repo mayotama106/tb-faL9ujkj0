@@ -2,7 +2,7 @@
    必要なチケットを漏れなくダブりなく決め、実施状況を追い、Excelに書き出す */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ENTRY_KINDS, EXCEL_HEADER, ITEM_KINDS, LAYERS, LAYER_KEYS, STATUSES, buildFeature, contentOf, defaultTitle, docValues,
+  ENTRY_KINDS, EXCEL_HEADER, FRONT, ITEM_KINDS, LAYERS, STATUSES, layerName, layersOf, buildFeature, contentOf, defaultTitle, docValues,
   excelRows, issuesOf, newEntry, newEvent, newItem, statusCount, ticketsOf,
   type EntryKind, type FEntry, type FEvent, type FItem, type Feature, type FTicket, type Layer, type Status
 } from "../domain/feature";
@@ -182,7 +182,7 @@ function PartsEditor({ f }: { f: Feature }) {
       <ul>
         <li>画面ごとに、操作(ボタン押下・入力・表示)をイベントとして全部挙げたか。初期表示もイベント</li>
         <li>イベントの中のチェック(入力・業務・権限)と、ロジック(取得・登録・更新・削除・外部連携)を全部挙げたか</li>
-        <li>チェック・ロジックごとに、実装する開発領域(CLIENT・BFF・BE)と、エラーハンドリングの有無を決めたか</li>
+        <li>チェック・ロジックごとに、実装する開発領域(CLIENT・BFF か BE)と、エラーハンドリングの有無を決めたか</li>
         <li><b>画面を介さないもの</b>(バッチ・定期実行、外部システムからの呼び出し、手動の運用作業)がないか</li>
       </ul>
     </div>
@@ -259,7 +259,7 @@ function EventView({ e, ev, i, j, handle }: { e: FEntry; ev: FEvent; i: number; 
       </div>
       <Kids>
         <SortableList ids={ev.items.map(it => it._k)} onMove={(a, b) => editFeature(ff => move(ff.entries[i].events[j].items, a, b))}>
-          {(_id, n, h) => <ItemView it={ev.items[n]} path={[...base, "items", n]} n={n} handle={h} onDelete={() => removeAt([...base, "items"], n, ITEM_KINDS[ev.items[n].kind])} />}
+          {(_id, n, h) => <ItemView it={ev.items[n]} split={!!ev.split} path={[...base, "items", n]} n={n} handle={h} onDelete={() => removeAt([...base, "items"], n, ITEM_KINDS[ev.items[n].kind])} />}
         </SortableList>
         <div className="links">
           <button type="button" className="etc-btn pal-data" onClick={() => add("check")}>＋ チェック</button>
@@ -270,7 +270,7 @@ function EventView({ e, ev, i, j, handle }: { e: FEntry; ev: FEvent; i: number; 
   );
 }
 
-function ItemView({ it, path, n, handle, onDelete }: { it: FItem; path: Path; n: number; handle: ReactNode; onDelete: () => void }) {
+function ItemView({ it, split, path, n, handle, onDelete }: { it: FItem; split: boolean; path: Path; n: number; handle: ReactNode; onDelete: () => void }) {
   const name = ITEM_KINDS[it.kind];
   return (
     <div className="check-item">
@@ -282,7 +282,12 @@ function ItemView({ it, path, n, handle, onDelete }: { it: FItem; path: Path; n:
       </div>
       <div className="err-row">
         <span className="lbl">開発領域</span>
-        {(["client", "bff", "be"] as const).map(l => <Chip key={l} on={it.layer === l} onClick={() => setF([...path, "layer"], l, false)}>{LAYERS[l]}</Chip>)}
+        {split
+          ? (["client", "bff", "be"] as const).map(l => <Chip key={l} on={it.layer === l} onClick={() => setF([...path, "layer"], l, false)}>{LAYERS[l]}</Chip>)
+          : <>
+            <Chip on={it.layer !== "be"} onClick={() => { if (it.layer === "be") setF([...path, "layer"], it.kind === "check" ? "bff" : "client", false); }}>{FRONT}</Chip>
+            <Chip on={it.layer === "be"} onClick={() => setF([...path, "layer"], "be", false)}>BE</Chip>
+          </>}
         <span className="lbl">エラーハンドリング</span>
         {(["あり", "なし"] as const).map(x => <Chip key={x} on={it.err === x} onClick={() => setF([...path, "err"], it.err === x ? "" : x, false)}>{x}</Chip>)}
       </div>
@@ -302,7 +307,7 @@ function SplitEditor({ f }: { f: Feature }) {
     return d ? buildTicket(genreOf(data, d.genre), d.v, defsOf(data)).missing : null;
   };
   return <>
-    <p className="hint">イベントごとに、開発領域(CLIENT・BFF・BE・エラーハンドリング)のチケットが自動でそろう。不要なものは「対象外」にする。1マスが1チケット。</p>
+    <p className="hint">イベントごとに、開発領域(CLIENT・BFF / BE / エラーハンドリング)のチケットが自動でそろう。CLIENT と BFF を別のチケットにするときは「CLIENTとBFFを分ける」。不要なものは「対象外」にする。1マスが1チケット。</p>
     <div className="status-sum">
       <span>チケット {tks.length} 件</span>
       {STATUSES.map(s => <span key={s} className={"st-pill st-" + STATUSES.indexOf(s)}>{s} {c[s]}</span>)}
@@ -314,9 +319,13 @@ function SplitEditor({ f }: { f: Feature }) {
         <div className="q">{(e.kind === "screen" ? "" : "[" + ENTRY_KINDS[e.kind].name + "] ") + (e.name.trim() || "(名前なし)") + (e.kind === "screen" ? "画面" : "")}</div>
         {e.events.map((ev, j) => (
           <div key={ev._k} className="split-event">
-            <div className="split-ev-name">{ENTRY_KINDS[e.kind].event}: {ev.name.trim() || "(名前なし)"}</div>
+            <div className="split-ev-name">
+              <span>{ENTRY_KINDS[e.kind].event}: {ev.name.trim() || "(名前なし)"}</span>
+              <button type="button" className="link small" onClick={() => toggleSplit(["entries", i, "events", j])}>
+                {ev.split ? FRONT + "を1チケットにまとめる" : "CLIENTとBFFを分ける"}</button>
+            </div>
             <div className="cells">
-              {LAYER_KEYS.map(l => <Cell key={l} f={f} e={e} ev={ev} l={l} path={["entries", i, "events", j, "cells", l]} docMissing={docMissing} />)}
+              {layersOf(ev).map(l => <Cell key={l} f={f} e={e} ev={ev} l={l} path={["entries", i, "events", j, "cells", l]} docMissing={docMissing} />)}
             </div>
           </div>
         ))}
@@ -327,12 +336,21 @@ function SplitEditor({ f }: { f: Feature }) {
   </>;
 }
 
+/* CLIENT と BFF を分ける・まとめる。分けるときは、BFF のマスを CLIENT のマスの状態から始める */
+function toggleSplit(path: Path) {
+  editFeature(ff => {
+    const x = getAt(ff, path) as FEvent;
+    if (!x.split) { const c = x.cells.client; x.cells.bff = { on: c.on, status: c.status || "未着手" }; }
+    x.split = !x.split;
+  });
+}
+
 function Cell({ f, e, ev, l, path, docMissing }: { f: Feature; e: FEntry; ev: FEvent; l: Layer; path: Path; docMissing: (id: string) => number | null }) {
   const cell = ev.cells[l] || { on: false };
   const tk = ticketsOf(f).find(x => x.event._k === ev._k && x.layer === l);
   if (!cell.on || !tk) return (
     <div className="cell off">
-      <span className="lname">{LAYERS[l]}</span>
+      <span className="lname">{layerName(ev, l)}</span>
       <span className="meta">対象外</span>
       <button type="button" className="link" onClick={() => setF([...path, "on"], true, false)}>チケットにする</button>
     </div>
@@ -342,13 +360,13 @@ function Cell({ f, e, ev, l, path, docMissing }: { f: Feature; e: FEntry; ev: FE
   return (
     <div className={"cell st-b" + STATUSES.indexOf(cell.status || "未着手")}>
       <div className="cell-head">
-        <span className="lname">{LAYERS[l]}</span>
+        <span className="lname">{layerName(ev, l)}</span>
         <span className="spacer" />
         <button type="button" className="link small" onClick={() => setF([...path, "on"], false, false)}>対象外にする</button>
       </div>
-      <AutoText id={fid([...path, "title"])} value={cell.title || ""} placeholder={defaultTitle(e, ev, l)} label={LAYERS[l] + "のチケットタイトル"}
+      <AutoText id={fid([...path, "title"])} value={cell.title || ""} placeholder={defaultTitle(e, ev, l)} label={layerName(ev, l) + "のチケットタイトル"}
         onChange={s => setF([...path, "title"], s)} />
-      <select value={cell.status || "未着手"} aria-label={LAYERS[l] + "の実施状況"} onChange={x => setF([...path, "status"], x.target.value as Status, false)}>
+      <select value={cell.status || "未着手"} aria-label={layerName(ev, l) + "の実施状況"} onChange={x => setF([...path, "status"], x.target.value as Status, false)}>
         {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
       {content.length > 0 ? <ul className="cell-items">{content.map((x, i) => <li key={i}>{x}</li>)}</ul> : <span className="meta">中身(チェック・ロジック)なし</span>}
@@ -400,7 +418,7 @@ export function FeatureWelcome() {
   return (
     <section className="card welcome">
       <h2>チケットを切り分ける</h2>
-      <p className="hint">フィーチャーを実装するのに必要なチケットを、漏れなくダブりなく切り分ける。画面を足すとイベントが入り、イベントごとに CLIENT・BFF・BE・エラーハンドリングのチケットが自動でそろう。実施状況を付けて、Excelに書き出して共有できる。</p>
+      <p className="hint">フィーチャーを実装するのに必要なチケットを、漏れなくダブりなく切り分ける。画面を足すとイベントが入り、イベントごとに CLIENT・BFF / BE / エラーハンドリングのチケットが自動でそろう。実施状況を付けて、Excelに書き出して共有できる。</p>
       <button type="button" className="primary" onClick={createFeature}>＋ 切り分けを始める</button>
     </section>
   );

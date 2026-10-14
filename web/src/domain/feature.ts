@@ -18,7 +18,8 @@ export type Status = "未着手" | "進行中" | "レビュー中" | "完了";
 
 export interface FItem { _k: string; kind: "check" | "logic"; name: string; layer: Exclude<Layer, "err">; err?: "" | "あり" | "なし"; errNote?: string }
 export interface FCell { on: boolean; title?: string; status?: Status; docId?: string }
-export interface FEvent { _k: string; name: string; items: FItem[]; cells: Record<Layer, FCell> }
+/* split: CLIENT と BFF を別のチケットにする(既定はまとめて1チケット) */
+export interface FEvent { _k: string; name: string; items: FItem[]; cells: Record<Layer, FCell>; split?: boolean }
 export interface FEntry { _k: string; kind: EntryKind; name: string; events: FEvent[] }
 export interface Feature { id: string; name: string; goal?: string; entries: FEntry[]; createdAt: number; updatedAt: number }
 
@@ -32,6 +33,12 @@ export const LAYERS: Record<Layer, string> = { client: "CLIENT", bff: "BFF", be:
 export const LAYER_KEYS = Object.keys(LAYERS) as Layer[];
 export const STATUSES: Status[] = ["未着手", "進行中", "レビュー中", "完了"];
 export const ITEM_KINDS = { check: "チェック", logic: "ロジック" } as const;
+
+/* CLIENT と BFF はまとめることが多い。まとめるときは client のマスを「CLIENT・BFF」のチケットとして使う */
+export const FRONT = "CLIENT・BFF";
+export const layersOf = (ev: FEvent): Layer[] => (ev.split ? LAYER_KEYS : LAYER_KEYS.filter(l => l !== "bff"));
+export const layerName = (ev: FEvent, l: Layer) => (!ev.split && l === "client" ? FRONT : LAYERS[l]);
+export const itemLayer = (ev: FEvent, it: FItem): Layer => (!ev.split && it.layer === "bff" ? "client" : it.layer);
 
 const t = (s: unknown) => (typeof s === "string" ? s : "").trim();
 export const entryLabel = (e: FEntry) => (t(e.name) || MISSING) + (e.kind === "screen" ? "画面" : "");
@@ -48,18 +55,18 @@ export const newItem = (kind: FItem["kind"], key: () => string): FItem => ({ _k:
 
 /* チケット(オンの開発領域)の一覧 */
 export interface FTicket {
-  entry: FEntry; event: FEvent; layer: Layer; cell: FCell; title: string; items: FItem[];
+  entry: FEntry; event: FEvent; layer: Layer; lname: string; cell: FCell; title: string; items: FItem[];
   path: (string | number)[];   /* フィーチャーの中のマスの位置 */
 }
 export function defaultTitle(e: FEntry, ev: FEvent, l: Layer) {
-  return entryLabel(e) + " " + (t(ev.name) || MISSING) + "(" + LAYERS[l] + ")";
+  return entryLabel(e) + " " + (t(ev.name) || MISSING) + "(" + layerName(ev, l) + ")";
 }
 export function itemsOf(ev: FEvent, l: Layer): FItem[] {
-  return l === "err" ? ev.items.filter(it => it.err === "あり") : ev.items.filter(it => it.layer === l);
+  return l === "err" ? ev.items.filter(it => it.err === "あり") : ev.items.filter(it => itemLayer(ev, it) === l);
 }
 export function ticketsOf(f: Feature): FTicket[] {
-  return f.entries.flatMap((e, i) => e.events.flatMap((ev, j) => LAYER_KEYS.filter(l => ev.cells[l]?.on).map(l => ({
-    entry: e, event: ev, layer: l, cell: ev.cells[l], title: t(ev.cells[l].title) || defaultTitle(e, ev, l),
+  return f.entries.flatMap((e, i) => e.events.flatMap((ev, j) => layersOf(ev).filter(l => ev.cells[l]?.on).map(l => ({
+    entry: e, event: ev, layer: l, lname: layerName(ev, l), cell: ev.cells[l], title: t(ev.cells[l].title) || defaultTitle(e, ev, l),
     items: itemsOf(ev, l), path: ["entries", i, "events", j, "cells", l]
   }))));
 }
@@ -87,10 +94,11 @@ export function issuesOf(f: Feature): Issue[] {
         const name = where + " / " + (t(it.name) || MISSING);
         if (!t(it.name)) out.push({ part: "parts", text: where + "の" + ITEM_KINDS[it.kind] + "の名前が未記入" });
         if (!it.err) out.push({ part: "parts", text: name + "のエラーハンドリングの有無が未定" });
-        if (!ev.cells[it.layer]?.on) out.push({ part: "split", text: name + "は" + LAYERS[it.layer] + "で実装するが、" + LAYERS[it.layer] + "のチケットがない" });
+        const l = layerName(ev, itemLayer(ev, it));
+        if (!ev.cells[itemLayer(ev, it)]?.on) out.push({ part: "split", text: name + "は" + l + "で実装するが、" + l + "のチケットがない" });
         if (it.err === "あり" && !ev.cells.err?.on) out.push({ part: "split", text: name + "はエラーハンドリングありだが、エラーハンドリングのチケットがない" });
       });
-      if (!LAYER_KEYS.some(l => ev.cells[l]?.on)) out.push({ part: "split", text: where + "のチケットが1つもない" });
+      if (!layersOf(ev).some(l => ev.cells[l]?.on)) out.push({ part: "split", text: where + "のチケットが1つもない" });
     });
   });
   return out;
@@ -122,7 +130,7 @@ export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
     blocks.push({ ...newBlock(COMPONENTS.screen, key), name: t(tk.entry.name), events: [{ _k: key(), name: t(tk.event.name), steps }] });
   return {
     _impl: 1, title: tk.title, story_goal: t(f.goal),
-    scope_in: [entryLabel(tk.entry) + " / " + (t(tk.event.name) || MISSING) + " の " + LAYERS[tk.layer]], scope_out: [],
+    scope_in: [entryLabel(tk.entry) + " / " + (t(tk.event.name) || MISSING) + " の " + tk.lname], scope_out: [],
     proc_name: blocks.length || !steps.length ? "" : t(tk.event.name), blocks: blocks.length ? blocks : steps
   };
 }
@@ -142,7 +150,7 @@ export function buildFeature(f: Feature, docMissing: (id: string) => number | nu
     e.events.forEach(ev => {
       tree.push(bullet(1, k.event + ": " + (t(ev.name) || MISSING)));
       ev.items.forEach(it => tree.push(bullet(2, ITEM_KINDS[it.kind] + ": " + (t(it.name) || MISSING) +
-        "(" + LAYERS[it.layer] + "・エラーハンドリング: " + (it.err || "未定") + ")")));
+        "(" + layerName(ev, itemLayer(ev, it)) + "・エラーハンドリング: " + (it.err || "未定") + ")")));
     });
   });
   blocks.push({ key: "parts", missing: issues.filter(i => i.part === "parts").length, lines: tree });
@@ -164,7 +172,7 @@ export function excelRows(features: Feature[]): string[][] {
   const rows: string[][] = [EXCEL_HEADER];
   features.forEach(f => ticketsOf(f).forEach(tk => rows.push([
     String(rows.length), t(f.name), ENTRY_KINDS[tk.entry.kind].name, entryLabel(tk.entry), t(tk.event.name),
-    LAYERS[tk.layer], tk.title, contentOf(tk).join("\n"), tk.cell.status || "未着手"
+    tk.lname, tk.title, contentOf(tk).join("\n"), tk.cell.status || "未着手"
   ])));
   return rows;
 }
@@ -178,7 +186,7 @@ export function migrateFeature(raw: unknown): Feature {
       _k: e._k || Math.random().toString(36).slice(2, 10), kind, name: t(e.name),
       events: (Array.isArray(e.events) ? e.events : []).map((ev: Values) => ({
         _k: ev._k || Math.random().toString(36).slice(2, 10), name: t(ev.name),
-        cells: ev.cells && typeof ev.cells === "object" ? { ...defaultCells(kind), ...ev.cells } : defaultCells(kind),
+        cells: ev.cells && typeof ev.cells === "object" ? { ...defaultCells(kind), ...ev.cells } : defaultCells(kind), split: !!ev.split,
         items: (Array.isArray(ev.items) ? ev.items : []).map((it: Values) => ({
           _k: it._k || Math.random().toString(36).slice(2, 10), kind: it.kind === "check" ? "check" : "logic", name: t(it.name),
           layer: it.layer === "client" || it.layer === "bff" || it.layer === "be" ? it.layer : it.kind === "check" ? "bff" : "be",

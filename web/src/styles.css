@@ -329,7 +329,7 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
 .split-entry { margin-bottom: 18px; }
 .split-entry > .q { margin-bottom: 6px; }
 .split-event { padding: 8px 0 10px 12px; border-left: 3px solid var(--mist); margin-bottom: 8px; }
-.split-ev-name { font-weight: 600; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+.split-ev-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-weight: 600; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
 .cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
 .cell { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 10px; background: #fff; border: 1px solid var(--mist); border-top-width: 4px; min-width: 0; }
 .cell.off { background: transparent; border-style: dashed; border-top-width: 1px; color: var(--muted); align-items: flex-start; }
