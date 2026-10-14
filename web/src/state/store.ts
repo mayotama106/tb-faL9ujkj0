@@ -40,7 +40,7 @@ let state: State = {
   ui: {
     currentId: init.currentId, part: {}, collapsed: init.collapsed, openEtc: [], editing: false,
     editGenre: "impl", query: "", filter: "", sidebar: false, toast: null,
-    view: "tickets", featureId: init.featureId, featurePart: {}
+    view: init.view, featureId: init.featureId, featurePart: {}
   },
   past: [], future: []
 };
@@ -99,7 +99,7 @@ function fixCurrent() {
 export function setUI(patch: Partial<UI> | ((ui: UI) => Partial<UI>)) {
   const p = typeof patch === "function" ? patch(state.ui) : patch;
   state = { ...state, ui: { ...state.ui, ...p } };
-  if ("collapsed" in p || "currentId" in p || "featureId" in p) persist(state);
+  if ("collapsed" in p || "currentId" in p || "featureId" in p || "view" in p) persist(state);
   emit();
 }
 

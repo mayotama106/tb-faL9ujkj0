@@ -18,7 +18,7 @@ const COMP_KEY = "ticket-builder:components:v1";
 const BACKUP_KEY = "ticket-builder:v2:before-impl";
 const known = (g: string) => !!GENRES[g] || OLD_IMPL_GENRES.includes(g);
 
-interface Stored { docs: Doc[]; currentId: string | null; collapsed: string[]; features?: Feature[]; featureId?: string | null }
+interface Stored { docs: Doc[]; currentId: string | null; collapsed: string[]; features?: Feature[]; featureId?: string | null; view?: "tickets" | "features" }
 
 function read<T>(key: string): T | null {
   try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
@@ -78,7 +78,7 @@ function migrateV1(): Stored {
   return { docs, currentId: currentId || (docs[0] ? docs[0].id : null), collapsed: (v1 && v1.c) || [] };
 }
 
-export function loadInitial(): { data: Data; currentId: string | null; collapsed: string[]; featureId: string | null } {
+export function loadInitial(): { data: Data; currentId: string | null; collapsed: string[]; featureId: string | null; view: "tickets" | "features" } {
   const stored = read<Stored>(KEY) || migrateV1();
   const docs = (stored.docs || []).filter(d => known(d.genre));
   /* 旧形式の API作成・画面作成・ロジック作成は、実装チケットに移す。移す前の内容は控えに残す */
@@ -99,13 +99,13 @@ export function loadInitial(): { data: Data; currentId: string | null; collapsed
   const currentId = docs.some(d => d.id === stored.currentId) ? stored.currentId : (docs[0] ? docs[0].id : null);
   const features = Array.isArray(stored.features) ? stored.features : [];
   const featureId = features.some(f => f.id === stored.featureId) ? stored.featureId || null : (features[0] ? features[0].id : null);
-  return { data: { docs, templates, comps, features }, currentId, collapsed: stored.collapsed || [], featureId };
+  return { data: { docs, templates, comps, features }, currentId, collapsed: stored.collapsed || [], featureId, view: stored.view === "features" ? "features" : "tickets" };
 }
 
 let lastTpl = "", lastComp = "";
 export function persist(s: State) {
   try {
-    const stored: Stored = { docs: s.data.docs, currentId: s.ui.currentId, collapsed: s.ui.collapsed, features: s.data.features, featureId: s.ui.featureId };
+    const stored: Stored = { docs: s.data.docs, currentId: s.ui.currentId, collapsed: s.ui.collapsed, features: s.data.features, featureId: s.ui.featureId, view: s.ui.view };
     localStorage.setItem(KEY, JSON.stringify(stored));
     const tpl = JSON.stringify(s.data.templates);
     if (tpl !== lastTpl) { localStorage.setItem(TPL_KEY, tpl); lastTpl = tpl; }
