@@ -307,7 +307,7 @@ function SplitEditor({ f }: { f: Feature }) {
     return d ? buildTicket(genreOf(data, d.genre), d.v, defsOf(data)).missing : null;
   };
   return <>
-    <p className="hint">イベントごとに、開発領域(CLIENT・BFF / BE / エラーハンドリング)のチケットが自動でそろう。CLIENT と BFF を別のチケットにするときは「CLIENTとBFFを分ける」。不要なものは「対象外」にする。1マスが1チケット。</p>
+    <p className="hint">イベントごとに、開発領域(CLIENT・BFF / BE / エラーハンドリング)のチケットが自動でそろう。CLIENT と BFF を別のチケットにするときは「CLIENTとBFFを分ける」。不要なもの(BE が要らないなど)は × で削除する。1マスが1チケット。</p>
     <div className="status-sum">
       <span>チケット {tks.length} 件</span>
       {STATUSES.map(s => <span key={s} className={"st-pill st-" + STATUSES.indexOf(s)}>{s} {c[s]}</span>)}
@@ -323,9 +323,14 @@ function SplitEditor({ f }: { f: Feature }) {
               <span>{ENTRY_KINDS[e.kind].event}: {ev.name.trim() || "(名前なし)"}</span>
               <button type="button" className="link small" onClick={() => toggleSplit(["entries", i, "events", j])}>
                 {ev.split ? FRONT + "を1チケットにまとめる" : "CLIENTとBFFを分ける"}</button>
+              {layersOf(ev).filter(l => !ev.cells[l]?.on).map(l => (
+                <button key={l} type="button" className="etc-btn small-btn" title="削除したチケットを戻す"
+                  onClick={() => setF(["entries", i, "events", j, "cells", l, "on"], true, false)}>＋ {layerName(ev, l)}</button>
+              ))}
             </div>
+            {!layersOf(ev).some(l => ev.cells[l]?.on) && <p className="hint">チケットなし(上の「＋」で戻せる)</p>}
             <div className="cells">
-              {layersOf(ev).map(l => <Cell key={l} f={f} e={e} ev={ev} l={l} path={["entries", i, "events", j, "cells", l]} docMissing={docMissing} />)}
+              {layersOf(ev).filter(l => ev.cells[l]?.on).map(l => <Cell key={l} f={f} e={e} ev={ev} l={l} path={["entries", i, "events", j, "cells", l]} docMissing={docMissing} />)}
             </div>
           </div>
         ))}
@@ -348,13 +353,7 @@ function toggleSplit(path: Path) {
 function Cell({ f, e, ev, l, path, docMissing }: { f: Feature; e: FEntry; ev: FEvent; l: Layer; path: Path; docMissing: (id: string) => number | null }) {
   const cell = ev.cells[l] || { on: false };
   const tk = ticketsOf(f).find(x => x.event._k === ev._k && x.layer === l);
-  if (!cell.on || !tk) return (
-    <div className="cell off">
-      <span className="lname">{layerName(ev, l)}</span>
-      <span className="meta">対象外</span>
-      <button type="button" className="link" onClick={() => setF([...path, "on"], true, false)}>チケットにする</button>
-    </div>
-  );
+  if (!tk) return null;
   const m = cell.docId ? docMissing(cell.docId) : null;
   const content = contentOf(tk);
   return (
@@ -362,7 +361,7 @@ function Cell({ f, e, ev, l, path, docMissing }: { f: Feature; e: FEntry; ev: FE
       <div className="cell-head">
         <span className="lname">{layerName(ev, l)}</span>
         <span className="spacer" />
-        <button type="button" className="link small" onClick={() => setF([...path, "on"], false, false)}>対象外にする</button>
+        <Del label={layerName(ev, l) + "のチケットを削除"} onClick={() => { setF([...path, "on"], false, false); toast(layerName(ev, l) + "のチケットを削除した", true); }} />
       </div>
       <AutoText id={fid([...path, "title"])} value={cell.title || ""} placeholder={defaultTitle(e, ev, l)} label={layerName(ev, l) + "のチケットタイトル"}
         onChange={s => setF([...path, "title"], s)} />
