@@ -1,11 +1,13 @@
-/* フィーチャーの分解の画面。定義 → 構成要素 → チケットへの切り分け の3パートで、
-   必要なチケットを漏れなくダブりなく決め、チケットビルダーのチケットを作る */
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+/* チケットの切り分けの画面。洗い出し → 切り分けと実施状況 の2パートで、
+   必要なチケットを漏れなくダブりなく決め、実施状況を追い、Excelに書き出す */
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ENTRY_KINDS, ITEM_KINDS, buildFeature, docValues, issuesOf, planTickets, unitsOf,
-  type EntryKind, type FEntry, type FEvent, type FItem, type Feature
+  ENTRY_KINDS, EXCEL_HEADER, ITEM_KINDS, LAYERS, LAYER_KEYS, STATUSES, buildFeature, contentOf, defaultTitle, docValues,
+  excelRows, issuesOf, newEntry, newEvent, newItem, statusCount, ticketsOf,
+  type EntryKind, type FEntry, type FEvent, type FItem, type Feature, type FTicket, type Layer, type Status
 } from "../domain/feature";
 import { buildTicket } from "../domain/ticket";
+import { buildXlsx, downloadXlsx } from "../domain/xlsx";
 import { ensureKeys } from "../state/persist";
 import { defsOf, genreOf, getAt, getState, newId, setAt, setUI, toast, update, useStore, type Doc } from "../state/store";
 import { stamp } from "../utils";
@@ -15,7 +17,8 @@ import { CopyButton } from "./Wizard";
 
 type Path = (string | number)[];
 const fid = (path: Path) => "ff_" + path.join("_");
-const PARTS = [{ key: "basic", title: "フィーチャーの定義" }, { key: "parts", title: "構成要素" }, { key: "split", title: "チケットへの切り分け" }];
+const PARTS = [{ key: "parts", title: "洗い出し" }, { key: "split", title: "切り分けと実施状況" }];
+const WIDTHS = [6, 22, 14, 18, 20, 16, 40, 48, 12];   /* Excelの列の幅 */
 
 /* ===== 操作 ===== */
 export const useFeature = () => useStore(s => s.data.features.find(f => f.id === s.ui.featureId) || null);
@@ -40,7 +43,7 @@ function removeAt(path: Path, i: number, what: string) {
 }
 export function createFeature() {
   const now = Date.now();
-  const f: Feature = { id: newId(), name: "", goal: "", scope_in: [], scope_out: [], entries: [], tickets: [], createdAt: now, updatedAt: now };
+  const f: Feature = { id: newId(), name: "", goal: "", entries: [], createdAt: now, updatedAt: now };
   update(d => { d.features.unshift(f); });
   setUI({ featureId: f.id, view: "features", sidebar: false });
   focusLater(fid(["name"]));
@@ -49,27 +52,28 @@ function goFPart(id: string, key: string) {
   setUI(ui => ({ featurePart: { ...ui.featurePart, [id]: key } }));
   window.scrollTo(0, 0);
 }
-/* チケット案から、チケットビルダーのチケットを作る(作ったら、そのチケットを開く) */
-function createDocFromPlan(ticketId: string) {
+/* チケットから、チケットビルダーの実装チケットを作る */
+function createDoc(tk: FTicket) {
   const s = getState();
   const f = s.data.features.find(x => x.id === s.ui.featureId);
-  const tk = f && f.tickets.find(x => x.id === ticketId);
-  if (!f || !tk) return;
+  if (!f) return;
   const v = docValues(f, tk, newId);
   ensureKeys(v);
   const now = Date.now();
-  const doc: Doc = { id: newId(), genre: tk.kind === "st" ? "st" : "impl", v, createdAt: now, updatedAt: now };
+  const doc: Doc = { id: newId(), genre: "impl", v, createdAt: now, updatedAt: now };
   update(d => {
     d.docs.unshift(doc);
     const ff = d.features.find(x => x.id === f.id);
-    const t2 = ff && ff.tickets.find(x => x.id === ticketId);
-    if (t2) t2.docId = doc.id;
+    if (ff) setAt(ff, [...tk.path, "docId"], doc.id);
   });
-  toast("チケットを作った。チケットの画面で続きを書く");
+  toast("チケットビルダーにチケットを作った");
 }
 function openDoc(id: string) {
   setUI({ view: "tickets", currentId: id, editing: false });
   window.scrollTo(0, 0);
+}
+function exportExcel(features: Feature[], name: string) {
+  downloadXlsx(buildXlsx(excelRows(features), "チケット", WIDTHS), name);
 }
 
 /* ===== 入力の部品 ===== */
@@ -84,34 +88,6 @@ function FText({ path, label, ph }: { path: Path; label?: string; ph?: string })
     </div>
   );
 }
-function FList({ path, label, ph }: { path: Path; label: string; ph?: string }) {
-  const f = useFeature();
-  const raw = f ? getAt(f, path) : [];
-  let items: string[] = Array.isArray(raw) ? raw : [];
-  if (!items.length) items = [""];
-  const edit = (fn: (a: string[]) => void, co?: string) => editFeature(ff => {
-    let a = getAt(ff, path);
-    if (!Array.isArray(a) || !a.length) { setAt(ff, path, items.slice()); a = getAt(ff, path); }
-    fn(a);
-  }, co ? path.join(".") + ":" + co : undefined);
-  const add = () => { focusLater(fid([...path, items.length])); edit(a => { a.push(""); }); };
-  return (
-    <div className="node">
-      <div className="q">{label}</div>
-      <div className="rows">
-        {items.map((it, i) => (
-          <div className="row" key={i}>
-            <AutoText id={fid([...path, i])} value={it} placeholder={ph} label={label + " " + (i + 1)}
-              onChange={s => edit(a => { a[i] = s; }, String(i))}
-              onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) { e.preventDefault(); add(); } }} />
-            <button type="button" className="del" aria-label={label + " " + (i + 1) + " を削除"} onClick={() => edit(a => { a.splice(i, 1); })}>×</button>
-          </div>
-        ))}
-        <button type="button" className="etc-btn" onClick={add}>＋ 項目を追加</button>
-      </div>
-    </div>
-  );
-}
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
   return <button type="button" className="chip" aria-pressed={on} onClick={onClick}>{children}</button>;
 }
@@ -123,21 +99,25 @@ function Del({ label, onClick }: { label: string; onClick: () => void }) {
 export function FeatureSidebar() {
   const features = useStore(s => s.data.features);
   const currentId = useStore(s => s.ui.featureId);
-  const rows = useMemo(() => features.map(f => ({ f, issues: issuesOf(f).length })).sort((a, b) => b.f.updatedAt - a.f.updatedAt), [features]);
+  const rows = useMemo(() => features.map(f => {
+    const tks = ticketsOf(f);
+    return { f, n: tks.length, done: statusCount(tks)["完了"], issues: issuesOf(f).length };
+  }).sort((a, b) => b.f.updatedAt - a.f.updatedAt), [features]);
   return (
     <div className="side">
       <div className="side-head">
-        <h2>フィーチャー</h2>
+        <h2>切り分け</h2>
         <button type="button" className="primary small" onClick={createFeature}>＋ 新しく作る</button>
       </div>
+      {features.length > 0 && <button type="button" className="plain small-btn" onClick={() => exportExcel(features, "チケット一覧")}>すべてExcelに書き出す</button>}
       <ul className="doclist">
-        {rows.map(({ f, issues }) => (
+        {rows.map(({ f, n, done, issues }) => (
           <li key={f.id} className={f.id === currentId ? "cur" : undefined}>
             <button type="button" className="open" onClick={() => { setUI({ featureId: f.id, sidebar: false }); window.scrollTo(0, 0); }}>
               <span className="t">{f.name.trim() || "(名前なし)"}</span>
               <span className="meta">
                 <span>{stamp(f.updatedAt)}</span>
-                <span>チケット {f.tickets.length}</span>
+                <span>完了 {done}/{n}</span>
                 <span className={issues ? "miss" : "done"}>{issues ? "確認事項 " + issues : "確認事項なし"}</span>
               </span>
             </button>
@@ -145,7 +125,7 @@ export function FeatureSidebar() {
               <button type="button" className="icon" title="削除" aria-label="削除" onClick={() => {
                 update(d => { d.features = d.features.filter(x => x.id !== f.id); });
                 if (currentId === f.id) setUI({ featureId: features.find(x => x.id !== f.id)?.id || null });
-                toast("フィーチャーを削除した(作ったチケットは残る)", true);
+                toast("削除した(ビルダーで作ったチケットは残る)", true);
               }}>×</button>
             </div>
           </li>
@@ -158,7 +138,7 @@ export function FeatureSidebar() {
 
 /* ===== 本体 ===== */
 export function FeatureWizard({ f }: { f: Feature }) {
-  const partKey = useStore(s => s.ui.featurePart[f.id]) || "basic";
+  const partKey = useStore(s => s.ui.featurePart[f.id]) || "parts";
   const issues = issuesOf(f);
   const idx = Math.max(0, PARTS.findIndex(p => p.key === partKey));
   const part = PARTS[idx];
@@ -179,14 +159,7 @@ export function FeatureWizard({ f }: { f: Feature }) {
       </nav>
       <section className="card part" key={f.id + part.key}>
         <h2><span className="pnum">{idx + 1} / {PARTS.length}</span>{part.title}</h2>
-        {part.key === "basic" && <>
-          <FText path={["name"]} label="フィーチャーの名前は？" ph="例: 口座開設書類のオンライン提出" />
-          <FText path={["goal"]} label="何を提供したい？(誰に、どんな価値を)" ph="例: 口座開設審査に必要な書類をオンラインで提出できるようにしたい" />
-          <FList path={["scope_in"]} label="スコープ内は？(このフィーチャーでやること)" ph="例: 書類のアップロード" />
-          <FList path={["scope_out"]} label="スコープ外は？(このフィーチャーではやらないこと)" ph="例: 提出済み書類の差し替え" />
-        </>}
-        {part.key === "parts" && <PartsEditor f={f} />}
-        {part.key === "split" && <SplitEditor f={f} />}
+        {part.key === "parts" ? <PartsEditor f={f} /> : <SplitEditor f={f} />}
       </section>
       <div className="pager">
         {prev ? <button type="button" className="plain" onClick={() => goFPart(f.id, prev.key)}>← {prev.title}</button> : <span />}
@@ -196,19 +169,20 @@ export function FeatureWizard({ f }: { f: Feature }) {
   );
 }
 
-/* 構成要素: 起点 → イベント → チェック・ロジック → エラーハンドリング */
+/* 洗い出し: 起点 → イベント → チェック・ロジック。起点を足すとイベントも1つ入る */
 function PartsEditor({ f }: { f: Feature }) {
   const add = (kind: EntryKind) => {
     focusLater(fid(["entries", f.entries.length, "name"]));
-    editFeature(ff => { ff.entries.push({ _k: newId(), kind, name: "", events: [] }); });
+    editFeature(ff => { ff.entries.push(newEntry(kind, newId)); });
   };
   return <>
+    <FText path={["name"]} label="フィーチャーの名前は？" ph="例: 口座開設書類のオンライン提出" />
     <div className="guide">
       <div className="q">漏れなく洗い出す</div>
       <ul>
         <li>画面ごとに、操作(ボタン押下・入力・表示)をイベントとして全部挙げたか。初期表示もイベント</li>
         <li>イベントの中のチェック(入力・業務・権限)と、ロジック(取得・登録・更新・削除・外部連携)を全部挙げたか</li>
-        <li>チェック・ロジックごとに、エラーハンドリングの有無を決めたか</li>
+        <li>チェック・ロジックごとに、実装する開発領域(CLIENT・BFF・BE)と、エラーハンドリングの有無を決めたか</li>
         <li><b>画面を介さないもの</b>(バッチ・定期実行、外部システムからの呼び出し、手動の運用作業)がないか</li>
       </ul>
     </div>
@@ -237,22 +211,33 @@ function EntryView({ e, i, handle }: { e: FEntry; i: number; handle: ReactNode }
         <span className="spacer" />
         <Del label={k.name + "を削除"} onClick={() => removeAt(["entries"], i, k.name)} />
       </div>
-      {e.kind !== "screen" && <p className="hint">画面を介さない処理。起動・呼び出しのきっかけと、中のチェック・ロジックを洗い出す。</p>}
-      <div className="chips">
-        {(Object.keys(ENTRY_KINDS) as EntryKind[]).map(x => (
-          <Chip key={x} on={e.kind === x} onClick={() => setF([...base, "kind"], x, false)}>{ENTRY_KINDS[x].name}</Chip>
-        ))}
-      </div>
+      {e.kind !== "screen" && <p className="hint">画面を介さない処理。チケットは最初 BE とエラーハンドリングだけ(切り分けで変えられる)。</p>}
       <FText path={[...base, "name"]} label={k.name + "の名前は？"} ph={k.ph} />
       <Kids>
         <SortableList ids={e.events.map(ev => ev._k)} onMove={(a, b) => editFeature(ff => move(ff.entries[i].events, a, b))}>
           {(_id, j, h) => <EventView e={e} ev={e.events[j]} i={i} j={j} handle={h} />}
         </SortableList>
-        <button type="button" className="etc-btn" onClick={() => {
-          focusLater(fid([...base, "events", e.events.length, "name"]));
-          editFeature(ff => { ff.entries[i].events.push({ _k: newId(), name: "", items: [] }); });
-        }}>＋ {k.event}</button>
+        <AddEvent e={e} i={i} />
       </Kids>
+    </div>
+  );
+}
+
+/* イベントの追加。名前を書いて Enter で足す(ボタンでも足せる) */
+function AddEvent({ e, i }: { e: FEntry; i: number }) {
+  const [name, setName] = useState("");
+  const k = ENTRY_KINDS[e.kind];
+  const add = () => {
+    const n = name.trim();
+    focusLater(n ? "ff_add_" + e._k : fid(["entries", i, "events", e.events.length, "name"]));
+    editFeature(ff => { ff.entries[i].events.push(newEvent(e.kind, n, newId)); });
+    setName("");
+  };
+  return (
+    <div className="add-event">
+      <AutoText id={"ff_add_" + e._k} value={name} placeholder={k.event + "を追加(名前を書いて Enter。" + k.eventPh + ")"} label={k.event + "を追加"}
+        onChange={setName} onKeyDown={ev => { if (ev.key === "Enter" && !ev.nativeEvent.isComposing) { ev.preventDefault(); add(); } }} />
+      <button type="button" className="etc-btn" onClick={add}>＋ {k.event}</button>
     </div>
   );
 }
@@ -262,17 +247,16 @@ function EventView({ e, ev, i, j, handle }: { e: FEntry; ev: FEvent; i: number; 
   const base: Path = ["entries", i, "events", j];
   const add = (kind: FItem["kind"]) => {
     focusLater(fid([...base, "items", ev.items.length, "name"]));
-    editFeature(ff => { ff.entries[i].events[j].items.push({ _k: newId(), kind, name: "", err: "" }); });
+    editFeature(ff => { ff.entries[i].events[j].items.push(newItem(kind, newId)); });
   };
   return (
     <div className="row-card">
-      <div className="step-head">
+      <div className="row">
         {handle}
         <span className="badge b-data">{k.event} {j + 1}</span>
-        <span className="spacer" />
+        <div className="grow"><FText path={[...base, "name"]} ph={k.eventPh} /></div>
         <Del label={k.event + "を削除"} onClick={() => removeAt(["entries", i, "events"], j, k.event)} />
       </div>
-      <FText path={[...base, "name"]} label={k.event + "の名前は？"} ph={k.eventPh} />
       <Kids>
         <SortableList ids={ev.items.map(it => it._k)} onMove={(a, b) => editFeature(ff => move(ff.entries[i].events[j].items, a, b))}>
           {(_id, n, h) => <ItemView it={ev.items[n]} path={[...base, "items", n]} n={n} handle={h} onDelete={() => removeAt([...base, "items"], n, ITEM_KINDS[ev.items[n].kind])} />}
@@ -297,88 +281,87 @@ function ItemView({ it, path, n, handle, onDelete }: { it: FItem; path: Path; n:
         <Del label={name + "を削除"} onClick={onDelete} />
       </div>
       <div className="err-row">
+        <span className="lbl">開発領域</span>
+        {(["client", "bff", "be"] as const).map(l => <Chip key={l} on={it.layer === l} onClick={() => setF([...path, "layer"], l, false)}>{LAYERS[l]}</Chip>)}
         <span className="lbl">エラーハンドリング</span>
         {(["あり", "なし"] as const).map(x => <Chip key={x} on={it.err === x} onClick={() => setF([...path, "err"], it.err === x ? "" : x, false)}>{x}</Chip>)}
       </div>
-      {it.err === "あり" && <FText path={[...path, "errNote"]} ph={it.kind === "check" ? "どんな場合にエラーか(任意。例: 拡張子が.pdfでない)" : "どんな場合にエラーか(任意。例: 保存に失敗した場合)"} />}
+      {it.err === "あり" && <FText path={[...path, "errNote"]} ph="どんな場合にエラーか(任意。例: 拡張子が.pdfでない)" />}
     </div>
   );
 }
 
-/* チケットへの切り分け: 単位(画面の表示・チェック・ロジック)を1つのチケットにだけ割り当てる */
+/* 切り分けと実施状況: イベントごとに、開発領域のチケットのマス(オン・オフ、タイトル、実施状況) */
 function SplitEditor({ f }: { f: Feature }) {
-  const units = unitsOf(f);
+  const tks = ticketsOf(f);
+  const c = statusCount(tks);
   const issues = issuesOf(f).filter(x => x.part === "split");
-  const docs = useStore(s => s.data.docs);
   const data = useStore(s => s.data);
-  const defs = defsOf(data);
   const docMissing = (id: string) => {
-    const d = docs.find(x => x.id === id);
-    return d ? buildTicket(genreOf(data, d.genre), d.v, defs).missing : null;
+    const d = data.docs.find(x => x.id === id);
+    return d ? buildTicket(genreOf(data, d.genre), d.v, defsOf(data)).missing : null;
   };
   return <>
-    <p className="hint">構成要素の「画面の表示」と「チェック・ロジック」を、どれか1つのチケットに割り当てる(1つに1チケットなのでダブりは起きない)。未割当が残らなければ漏れもない。</p>
-    <button type="button" className="primary" onClick={() => editFeature(ff => {
-      const n = planTickets(ff, newId);
-      ff.tickets = n.tickets; ff.entries = n.entries;
-    })}>未割当の分からチケット案を作る</button>
-    <p className="hint">画面の表示は画面ごと、チェック・ロジックはイベントごとに1チケットにまとめる。STチケットがなければ1つ足す。割り当て済みのものは変えない。</p>
-
-    <div className="node">
-      <div className="q">チケット</div>
-      <SortableList ids={f.tickets.map(x => x.id)} onMove={(a, b) => editFeature(ff => move(ff.tickets, a, b))}>
-        {(_id, i, handle) => {
-          const tk = f.tickets[i];
-          const mine = units.filter(u => u.ticket === tk.id);
-          const m = tk.docId ? docMissing(tk.docId) : null;
-          return (
-            <div className="row-card">
-              <div className="row">
-                {handle}
-                <span className={"badge " + (tk.kind === "st" ? "b-data" : "b-box")}>{tk.kind === "st" ? "ST" : "実装"}</span>
-                <div className="grow"><FText path={["tickets", i, "title"]} ph="チケットのタイトル" /></div>
-                <Del label="チケットを削除" onClick={() => removeAt(["tickets"], i, "チケット案")} />
-              </div>
-              {mine.length > 0 && <ul className="ac-auto">{mine.map(u => <li key={u.key}>{u.label}</li>)}</ul>}
-              <div className="actions">
-                {tk.docId && m != null
-                  ? <><button type="button" className="plain" onClick={() => openDoc(tk.docId!)}>チケットを開く</button>
-                    <span className={m ? "st miss" : "st done"}>{m ? "未記入 " + m : "記入済み"}</span></>
-                  : <button type="button" className="primary small" onClick={() => createDocFromPlan(tk.id)}>ビルダーでチケットを作る</button>}
-              </div>
-            </div>
-          );
-        }}
-      </SortableList>
-      <div className="links">
-        <button type="button" className="etc-btn" onClick={() => editFeature(ff => { ff.tickets.push({ id: newId(), title: "", kind: "impl" }); })}>＋ 実装チケット</button>
-        <button type="button" className="etc-btn" onClick={() => editFeature(ff => { ff.tickets.push({ id: newId(), title: (ff.name || "") + "のST", kind: "st" }); })}>＋ STチケット</button>
-      </div>
+    <p className="hint">イベントごとに、開発領域(CLIENT・BFF・BE・エラーハンドリング)のチケットが自動でそろう。不要なものは「対象外」にする。1マスが1チケット。</p>
+    <div className="status-sum">
+      <span>チケット {tks.length} 件</span>
+      {STATUSES.map(s => <span key={s} className={"st-pill st-" + STATUSES.indexOf(s)}>{s} {c[s]}</span>)}
+      <span className="spacer" />
+      <button type="button" className="primary small" onClick={() => exportExcel([f], f.name.trim() || "チケット一覧")}>Excelに書き出す</button>
     </div>
-
-    <div className="node">
-      <div className="q">割り当て(構成要素 → チケット)</div>
-      {!units.length && <p className="hint">構成要素に画面やチェック・ロジックを足すと、ここに並ぶ。</p>}
-      <div className="assign">
-        {units.map(u => (
-          <label key={u.key} className={"assign-row" + (u.ticket && f.tickets.some(x => x.id === u.ticket) ? "" : " none")}>
-            <span className="lbl">{u.label}</span>
-            <select value={f.tickets.some(x => x.id === u.ticket) ? u.ticket : ""} onChange={e => setF(u.path, e.target.value, false)}>
-              <option value="">(未割当)</option>
-              {f.tickets.filter(x => x.kind === "impl").map(x => <option key={x.id} value={x.id}>{x.title.trim() || "(タイトルなし)"}</option>)}
-            </select>
-          </label>
+    {f.entries.map((e, i) => (
+      <div key={e._k} className="split-entry">
+        <div className="q">{(e.kind === "screen" ? "" : "[" + ENTRY_KINDS[e.kind].name + "] ") + (e.name.trim() || "(名前なし)") + (e.kind === "screen" ? "画面" : "")}</div>
+        {e.events.map((ev, j) => (
+          <div key={ev._k} className="split-event">
+            <div className="split-ev-name">{ENTRY_KINDS[e.kind].event}: {ev.name.trim() || "(名前なし)"}</div>
+            <div className="cells">
+              {LAYER_KEYS.map(l => <Cell key={l} f={f} e={e} ev={ev} l={l} path={["entries", i, "events", j, "cells", l]} docMissing={docMissing} />)}
+            </div>
+          </div>
         ))}
       </div>
-    </div>
-
+    ))}
+    {!f.entries.length && <p className="hint">「洗い出し」で画面などを足すと、ここにチケットが並ぶ。</p>}
     {issues.length > 0 && <div className="guide"><div className="q">確認事項</div><ul>{issues.map((x, i) => <li key={i}>{x.text}</li>)}</ul></div>}
   </>;
 }
 
-/* 分解の結果のプレビュー */
+function Cell({ f, e, ev, l, path, docMissing }: { f: Feature; e: FEntry; ev: FEvent; l: Layer; path: Path; docMissing: (id: string) => number | null }) {
+  const cell = ev.cells[l] || { on: false };
+  const tk = ticketsOf(f).find(x => x.event._k === ev._k && x.layer === l);
+  if (!cell.on || !tk) return (
+    <div className="cell off">
+      <span className="lname">{LAYERS[l]}</span>
+      <span className="meta">対象外</span>
+      <button type="button" className="link" onClick={() => setF([...path, "on"], true, false)}>チケットにする</button>
+    </div>
+  );
+  const m = cell.docId ? docMissing(cell.docId) : null;
+  const content = contentOf(tk);
+  return (
+    <div className={"cell st-b" + STATUSES.indexOf(cell.status || "未着手")}>
+      <div className="cell-head">
+        <span className="lname">{LAYERS[l]}</span>
+        <span className="spacer" />
+        <button type="button" className="link small" onClick={() => setF([...path, "on"], false, false)}>対象外にする</button>
+      </div>
+      <AutoText id={fid([...path, "title"])} value={cell.title || ""} placeholder={defaultTitle(e, ev, l)} label={LAYERS[l] + "のチケットタイトル"}
+        onChange={s => setF([...path, "title"], s)} />
+      <select value={cell.status || "未着手"} aria-label={LAYERS[l] + "の実施状況"} onChange={x => setF([...path, "status"], x.target.value as Status, false)}>
+        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+      {content.length > 0 ? <ul className="cell-items">{content.map((x, i) => <li key={i}>{x}</li>)}</ul> : <span className="meta">中身(チェック・ロジック)なし</span>}
+      {cell.docId && m != null
+        ? <button type="button" className="link small" onClick={() => openDoc(cell.docId!)}>ビルダーで開く({m ? "未記入 " + m : "記入済み"})</button>
+        : <button type="button" className="link small" onClick={() => createDoc(tk)}>ビルダーでチケットを作る</button>}
+    </div>
+  );
+}
+
+/* 切り分けの結果のプレビュー */
 export function FeaturePreview({ f }: { f: Feature }) {
-  const partKey = useStore(s => s.ui.featurePart[f.id]) || "basic";
+  const partKey = useStore(s => s.ui.featurePart[f.id]) || "parts";
   const data = useStore(s => s.data);
   const box = useRef<HTMLDivElement>(null);
   const r = useMemo(() => buildFeature(f, id => {
@@ -391,9 +374,9 @@ export function FeaturePreview({ f }: { f: Feature }) {
     if (cur) b.scrollTo({ top: Math.max(0, cur.offsetTop - b.offsetTop - 12), behavior: "smooth" });
   }, [partKey]);
   return (
-    <section className="preview" aria-label="分解の結果">
+    <section className="preview" aria-label="切り分けの結果">
       <div className="bar">
-        <h2>分解の結果</h2>
+        <h2>切り分けの結果</h2>
         <span className={r.missing ? "count" : "count done"}>{r.missing ? "確認事項 " + r.missing + " 件" : "確認事項なし"}</span>
       </div>
       <div className="out" ref={box}>
@@ -405,9 +388,10 @@ export function FeaturePreview({ f }: { f: Feature }) {
         ))}
       </div>
       <div className="actions">
-        <CopyButton className="primary" text={() => r.text} done="コピーした">分解の結果をコピー</CopyButton>
+        <button type="button" className="primary" onClick={() => exportExcel([f], f.name.trim() || "チケット一覧")}>Excelに書き出す</button>
+        <CopyButton className="plain" text={() => r.text} done="コピーした">文字でコピー</CopyButton>
       </div>
-      <p className="note">フィーチャーもこのブラウザ内に自動保存される。チケットビルダーのチケットとつながっている。</p>
+      <p className="note">Excelの列: {EXCEL_HEADER.join(" / ")}。1チケット1行。</p>
     </section>
   );
 }
@@ -415,9 +399,9 @@ export function FeaturePreview({ f }: { f: Feature }) {
 export function FeatureWelcome() {
   return (
     <section className="card welcome">
-      <h2>フィーチャーを分解する</h2>
-      <p className="hint">フィーチャーを実装するのに必要なチケットを、漏れなくダブりなく切り分ける。画面 → イベント → チェック・ロジック → エラーハンドリングの順に洗い出し、チケットに割り当てて、そのままチケットビルダーで作る。</p>
-      <button type="button" className="primary" onClick={createFeature}>＋ フィーチャーを作る</button>
+      <h2>チケットを切り分ける</h2>
+      <p className="hint">フィーチャーを実装するのに必要なチケットを、漏れなくダブりなく切り分ける。画面を足すとイベントが入り、イベントごとに CLIENT・BFF・BE・エラーハンドリングのチケットが自動でそろう。実施状況を付けて、Excelに書き出して共有できる。</p>
+      <button type="button" className="primary" onClick={createFeature}>＋ 切り分けを始める</button>
     </section>
   );
 }

@@ -1,6 +1,6 @@
 /* ブラウザ内(localStorage)への保存と、旧版のデータの引き継ぎ */
 import { COMPONENTS, type CompDef } from "../domain/components";
-import type { Feature } from "../domain/feature";
+import { migrateFeature, type Feature } from "../domain/feature";
 import { GENRES, type Genre } from "../domain/genres";
 import { OLD_IMPL_GENRES, toImpl, upgradeImpl } from "./migrateImpl";
 import type { Values } from "../domain/ticket";
@@ -97,7 +97,7 @@ export function loadInitial(): { data: Data; currentId: string | null; collapsed
   const c = read<Record<string, CompDef>>(COMP_KEY) || {};
   Object.keys(c).forEach(k => { if (COMPONENTS[k] && c[k] && Array.isArray(c[k].fields)) comps[k] = c[k]; });
   const currentId = docs.some(d => d.id === stored.currentId) ? stored.currentId : (docs[0] ? docs[0].id : null);
-  const features = Array.isArray(stored.features) ? stored.features : [];
+  const features = Array.isArray(stored.features) ? stored.features.map(migrateFeature) : [];
   const featureId = features.some(f => f.id === stored.featureId) ? stored.featureId || null : (features[0] ? features[0].id : null);
   return { data: { docs, templates, comps, features }, currentId, collapsed: stored.collapsed || [], featureId, view: stored.view === "features" ? "features" : "tickets" };
 }
