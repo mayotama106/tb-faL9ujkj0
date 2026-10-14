@@ -16,7 +16,7 @@ export function Sidebar() {
   const [picking, setPicking] = useState(false);
 
   const rows = useMemo(() => docs.map(d => {
-    const g = genreOf({ docs, templates, comps: {} }, d.genre);
+    const g = genreOf({ docs, templates, comps: {}, features: [] }, d.genre);
     return { d, g, title: titleOf(d.v), missing: buildTicket(g, d.v, defs).missing };
   }), [docs, templates, defs]);
   const q = query.trim().toLowerCase();

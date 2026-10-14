@@ -5,6 +5,7 @@ import { produce, type Draft } from "immer";
 import { useSyncExternalStore } from "react";
 import { COMPONENTS, type CompDef } from "../domain/components";
 import { GENRES, type Genre } from "../domain/genres";
+import type { Feature } from "../domain/feature";
 import type { Values } from "../domain/ticket";
 import { loadInitial, persist } from "./persist";
 
@@ -13,6 +14,7 @@ export interface Data {
   docs: Doc[];
   templates: Record<string, Genre>;   /* 編集したテンプレート。初期状態と同じジャンルは持たない */
   comps: Record<string, CompDef>;     /* 編集した部品の定義。初期の定義と同じ部品は持たない */
+  features: Feature[];                /* フィーチャーの分解 */
 }
 export interface Toast { id: number; text: string; undo: boolean }
 export interface UI {
@@ -26,6 +28,9 @@ export interface UI {
   filter: string;
   sidebar: boolean;               /* 狭い画面でのチケット一覧の表示 */
   toast: Toast | null;
+  view: "tickets" | "features";   /* チケット(ビルダー)とフィーチャー(分解)の切り替え */
+  featureId: string | null;
+  featurePart: Record<string, string>;
 }
 export interface State { data: Data; ui: UI; past: Data[]; future: Data[] }
 
@@ -34,7 +39,8 @@ let state: State = {
   data: init.data,
   ui: {
     currentId: init.currentId, part: {}, collapsed: init.collapsed, openEtc: [], editing: false,
-    editGenre: "impl", query: "", filter: "", sidebar: false, toast: null
+    editGenre: "impl", query: "", filter: "", sidebar: false, toast: null,
+    view: "tickets", featureId: init.featureId, featurePart: {}
   },
   past: [], future: []
 };
@@ -93,7 +99,7 @@ function fixCurrent() {
 export function setUI(patch: Partial<UI> | ((ui: UI) => Partial<UI>)) {
   const p = typeof patch === "function" ? patch(state.ui) : patch;
   state = { ...state, ui: { ...state.ui, ...p } };
-  if ("collapsed" in p || "currentId" in p) persist(state);
+  if ("collapsed" in p || "currentId" in p || "featureId" in p) persist(state);
   emit();
 }
 

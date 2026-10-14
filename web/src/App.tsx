@@ -7,6 +7,7 @@ import { Preview } from "./components/Preview";
 import { Sidebar } from "./components/Sidebar";
 import { TemplateEditor, genreOfSel } from "./components/TemplateEditor";
 import { Wizard } from "./components/Wizard";
+import { FeaturePreview, FeatureSidebar, FeatureWelcome, FeatureWizard, useFeature } from "./components/Features";
 
 const EMPTY = {};
 
@@ -19,6 +20,8 @@ export function App() {
   const canUndo = useStore(s => s.past.length > 0);
   const canRedo = useStore(s => s.future.length > 0);
   const partKey = useStore(s => (doc && s.ui.part[doc.id]) || "basic");
+  const view = useStore(s => s.ui.view);
+  const feature = useFeature();
 
   /* Ctrl+Z で取り消し、Ctrl+Shift+Z または Ctrl+Y でやり直し(MacはCommand) */
   useEffect(() => {
@@ -42,17 +45,27 @@ export function App() {
 
   return <>
     <header className="top">
-      <button type="button" className="menu" aria-expanded={sidebar} onClick={() => setUI({ sidebar: !sidebar })}>☰<span className="lbl"> チケット一覧</span></button>
+      <button type="button" className="menu" aria-expanded={sidebar} onClick={() => setUI({ sidebar: !sidebar })}>☰<span className="lbl"> 一覧</span></button>
       <span className="brand">TICKET BUILDER</span>
+      {/* チケット(ビルダー)とフィーチャー(分解)の切り替え */}
+      <div className="views" role="group" aria-label="画面の切り替え">
+        <button type="button" className={view === "tickets" ? "hbtn on" : "hbtn"} aria-pressed={view === "tickets"} onClick={() => setUI({ view: "tickets" })}>チケット</button>
+        <button type="button" className={view === "features" ? "hbtn on" : "hbtn"} aria-pressed={view === "features"} onClick={() => setUI({ view: "features", editing: false })}>フィーチャー</button>
+      </div>
       <span className="spacer" />
       <button type="button" className="hbtn" disabled={!canUndo} onClick={undo} title="元に戻す(Ctrl+Z)" aria-label="元に戻す">↶<span className="lbl"> 元に戻す</span></button>
       <button type="button" className="hbtn" disabled={!canRedo} onClick={redo} title="やり直す(Ctrl+Shift+Z)" aria-label="やり直す">↷<span className="lbl"> やり直す</span></button>
-      <button type="button" className={editing ? "hbtn on" : "hbtn"} aria-pressed={editing}
+      {view === "tickets" && <button type="button" className={editing ? "hbtn on" : "hbtn"} aria-pressed={editing}
         onClick={() => setUI(ui => ({ editing: !ui.editing, editGenre: doc ? doc.genre : ui.editGenre }))}>
         {editing ? "編集を終える" : <>テンプレート<span className="lbl">を編集</span></>}
-      </button>
+      </button>}
     </header>
-    <div className="app">
+    {view === "features" ? <div className="app">
+      <aside className={sidebar ? "sidebar open" : "sidebar"}><FeatureSidebar /></aside>
+      {sidebar && <div className="scrim" onClick={() => setUI({ sidebar: false })} />}
+      <main className="main">{feature ? <FeatureWizard f={feature} /> : <FeatureWelcome />}</main>
+      {feature && <div className="preview-col"><FeaturePreview f={feature} /></div>}
+    </div> : <div className="app">
       <aside className={sidebar ? "sidebar open" : "sidebar"}><Sidebar /></aside>
       {sidebar && <div className="scrim" onClick={() => setUI({ sidebar: false })} />}
       <main className="main">
@@ -66,7 +79,7 @@ export function App() {
             onGo={!editing && doc ? key => goPart(doc.id, key) : undefined} />
         </div>
       )}
-    </div>
+    </div>}
     <ToastView />
   </>;
 }
