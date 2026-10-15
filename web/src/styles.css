@@ -344,3 +344,14 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
 @media (max-width: 599px) { .views { margin-left: 0; } }
 .row-card .row { align-items: center; }
 .row-card .grow { flex: 1 1 auto; min-width: 0; }
+
+/* ===== ローカル版・データ ===== */
+.local-menu { position: relative; }
+.local-pop {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: min(320px, calc(100vw - 32px));
+  display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 12px;
+  background: #fff; color: var(--navy); border: 1px solid var(--mist); box-shadow: 0 8px 24px rgba(11, 27, 58, 0.18);
+}
+.local-pop a.primary { text-align: center; text-decoration: none; }
+.local-pop .hint { margin: 0; }
+@media (max-width: 599px) { .local-pop { position: fixed; right: 16px; top: calc(var(--top) + 8px); } }

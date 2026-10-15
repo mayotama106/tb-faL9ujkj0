@@ -113,3 +113,21 @@ export function persist(s: State) {
     if (comp !== lastComp) { localStorage.setItem(COMP_KEY, comp); lastComp = comp; }
   } catch { /* 保存領域が使えない環境では保存なしで動く */ }
 }
+
+/* ===== データの持ち運び(公開版とローカル版はブラウザの保存先が別なので、ファイルで移す) ===== */
+const MOVE_KEYS = [KEY, TPL_KEY, COMP_KEY];
+export function exportData(): string {
+  const items: Record<string, string> = {};
+  MOVE_KEYS.forEach(k => { try { const v = localStorage.getItem(k); if (v != null) items[k] = v; } catch { /* 何もしない */ } });
+  return JSON.stringify({ app: "ticket-builder", version: 1, exportedAt: new Date().toISOString(), items }, null, 1);
+}
+/* 読み込んだら置き換える(今の内容は控えに残す)。形が違えばエラー */
+export function importData(text: string) {
+  const o = JSON.parse(text);
+  if (!o || o.app !== "ticket-builder" || !o.items || typeof o.items !== "object") throw new Error("チケットビルダーのデータではありません");
+  const items = o.items as Record<string, unknown>;
+  if (!MOVE_KEYS.some(k => typeof items[k] === "string")) throw new Error("データが入っていません");
+  MOVE_KEYS.forEach(k => { if (typeof items[k] === "string") JSON.parse(items[k] as string); });
+  localStorage.setItem(KEY + ":before-import", exportData());
+  MOVE_KEYS.forEach(k => { if (typeof items[k] === "string") localStorage.setItem(k, items[k] as string); else localStorage.removeItem(k); });
+}

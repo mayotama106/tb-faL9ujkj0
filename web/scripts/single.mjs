@@ -16,4 +16,6 @@ html = html.replace(/<link rel="stylesheet" crossorigin href="\.\/([^"]+)">/g,
 if (/src="\.\/assets|href="\.\/assets/.test(html)) throw new Error("埋め込めなかったファイルがある");
 mkdirSync(join(root, "dist-single"), { recursive: true });
 writeFileSync(join(root, "dist-single", "index.html"), html);
+/* 公開版からダウンロードできるように dist にも置く */
+writeFileSync(join(dist, "ticket-builder.html"), html);
 console.log("dist-single/index.html", Math.round(html.length / 1024) + " KB");

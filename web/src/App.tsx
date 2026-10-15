@@ -7,6 +7,7 @@ import { Preview } from "./components/Preview";
 import { Sidebar } from "./components/Sidebar";
 import { TemplateEditor, genreOfSel } from "./components/TemplateEditor";
 import { Wizard } from "./components/Wizard";
+import { LocalMenu } from "./components/LocalMenu";
 import { FeaturePreview, FeatureSidebar, FeatureWelcome, FeatureWizard, useFeature } from "./components/Features";
 
 const EMPTY = {};
@@ -59,6 +60,7 @@ export function App() {
         onClick={() => setUI(ui => ({ editing: !ui.editing, editGenre: doc ? doc.genre : ui.editGenre }))}>
         {editing ? "編集を終える" : <>テンプレート<span className="lbl">を編集</span></>}
       </button>}
+      <LocalMenu />
     </header>
     {view === "features" ? <div className="app">
       <aside className={sidebar ? "sidebar open" : "sidebar"}><FeatureSidebar /></aside>
