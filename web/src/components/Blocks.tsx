@@ -5,7 +5,9 @@ import {
   type CaseVal, type CompDef, type FieldDef
 } from "../domain/components";
 import type { Values } from "../domain/ticket";
-import { defsOf, editDoc, getAt, newId, setAt, setValue, toast, useStore } from "../state/store";
+import { checkMove, moveBlock, type Spot } from "../domain/moveBlock";
+import { currentDoc, defsOf, editDoc, getAt, getState, newId, setAt, setValue, toast, useStore } from "../state/store";
+import { BlockDnd, DndBlock, DropEnd, useBlockDnd } from "./BlockDnd";
 import { AutoText, Chips, Field, Kids, Toggle, focusLater, useCollapsed, useVAt } from "./Fields";
 import { SortableList, move } from "./Sortable";
 
@@ -46,21 +48,34 @@ const groupClass = (g: string) => (g === "入れ物" || g === "テスト準備" 
 export function BlockList({ path, top, groups = GROUPS }: { path: Path; top?: boolean; groups?: string[] }) {
   const defs = useDefs();
   const arr: Values[] = useVAt(path) || [];
-  const ids = arr.map((b, i) => b._k || "i" + i);
+  const inDnd = useBlockDnd();
   const add = (def: CompDef) => {
     const b = newBlock(def, newId);
     const hf = def.fields.find(f => f.head) || def.fields[0];
     if (hf) focusLater(fid([...path, arr.length, hf.id]));
     editDoc(v => { arrayAt(v, path).push(b); });
   };
-  return (
+  const list = (
     <div className="blocks">
-      <SortableList ids={ids} onMove={(f, to) => editDoc(v => move(arrayAt(v, path), f, to))}>
-        {(_id, i, handle) => <BlockView path={path} index={i} handle={handle} numbered={!!top || !defs[arr[i]?.type]?.container} />}
-      </SortableList>
-      <Palette top={!!top} groups={groups} onAdd={add} />
+      {arr.map((b, i) => (
+        <DndBlock key={b._k || fid(path) + "#" + i} id={b._k || fid(path) + "#" + i} path={path} index={i}>
+          {handle => <BlockView path={path} index={i} handle={handle} numbered={!!top || !defs[b?.type]?.container} />}
+        </DndBlock>
+      ))}
+      <DropEnd path={path}><Palette top={!!top} groups={groups} onAdd={add} /></DropEnd>
     </div>
   );
+  /* いちばん外の並びが、チケット全体のドラッグ領域を持つ */
+  if (inDnd) return list;
+  const onMove = (from: Spot, to: Spot) => {
+    const doc = currentDoc(getState());
+    if (!doc) return;
+    const why = checkMove(doc.v, from, to, path, defs);
+    if (why) { toast(why); return; }
+    if (why === "") return;
+    editDoc(v => moveBlock(v, from, to));
+  };
+  return <BlockDnd onMove={onMove}>{list}</BlockDnd>;
 }
 
 /* 条件分岐の中では、エラーハンドリングの「どんな場合？」は場合の条件で足りる */

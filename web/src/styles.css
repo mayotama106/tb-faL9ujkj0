@@ -355,3 +355,14 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
 .local-pop a.primary { text-align: center; text-decoration: none; }
 .local-pop .hint { margin: 0; }
 @media (max-width: 599px) { .local-pop { position: fixed; right: 16px; top: calc(var(--top) + 8px); } }
+
+/* ===== 部品の移動(入れ子の中・外へも) ===== */
+.sortable.drop-before::before, .sortable.drop-after::after {
+  content: ""; position: absolute; left: 0; right: 0; height: 4px; border-radius: 2px; background: var(--gold); z-index: 6; pointer-events: none;
+}
+.sortable.drop-before::before { top: -5px; }
+.sortable.drop-after::after { bottom: -5px; }
+.drop-end { position: relative; border-radius: 10px; outline: 2px dashed transparent; outline-offset: 2px; }
+.drop-end.on { outline-color: rgba(161, 178, 214, 0.6); }
+.drop-end.hit { outline-color: var(--gold); background: rgba(180, 138, 90, 0.08); }
+.drop-label { position: absolute; right: 8px; top: -24px; z-index: 6; font-size: 12px; font-weight: 700; color: #fff; background: var(--gold); padding: 1px 8px; border-radius: 999px; pointer-events: none; }
