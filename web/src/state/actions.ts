@@ -31,6 +31,7 @@ export function duplicateDoc(id: string) {
   if (!src) return;
   const v = JSON.parse(JSON.stringify(src.v));
   v.title = ((v.title || "").trim() + "(コピー)").trim();
+  delete v.feat_ref;   /* 切り分けのチケットとのつながりは、元のチケットにだけ残す */
   ensureKeys(v);
   const now = Date.now();
   const doc: Doc = { id: newId(), genre: src.genre, v, createdAt: now, updatedAt: now };

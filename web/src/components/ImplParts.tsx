@@ -1,8 +1,10 @@
 /* 実装チケットの入力画面。パートは タイトルとストーリー / 組み立て / 受け入れ条件 / 制約事項・技術的補足 */
+import { useMemo } from "react";
+import { allTickets, partOf, refOf, sameRef, type FeatRef } from "../domain/feature";
 import { MOD, NEW, type Genre, type QNode } from "../domain/genres";
 import { collectAc } from "../domain/impl";
 import { headsOf, type Values } from "../domain/ticket";
-import { defsOf, useStore } from "../state/store";
+import { defsOf, update, useStore } from "../state/store";
 import { BlockList, CodeLists, ErrorEditor } from "./Blocks";
 import { Chips, Field, useV } from "./Fields";
 import { ListControl } from "./Steps";
@@ -16,6 +18,7 @@ export function ImplPart({ g, partKey }: { g: Genre; partKey: string }) {
   switch (partKey) {
     case "basic": return <>
       <Field path={["title"]} label="タイトル(Jiraの要約欄に入れる)" ph="例: ファイルアップロード機能の構築（BE）" />
+      <FeaturePick />
       <Field path={["story_goal"]} label="何を提供したい？(誰に、どんな価値を)" ph="例: 口座開設審査に必要な書類をオンラインでアップロードできる機能を提供したい" />
       <div className="node">
         <div className="head"><div className="q">参照するものは？(APIや設計書。メソッドとパス)</div><span className="opt">任意</span></div>
@@ -92,4 +95,48 @@ export function ImplPart({ g, partKey }: { g: Genre; partKey: string }) {
     </>;
   }
   return null;
+}
+
+/* 対象のフィーチャー。切り分けのチケットから選ぶと、フィーチャー名と対象の部分が入り、切り分けの側からもこのチケットを開ける */
+function FeaturePick() {
+  const v = useV();
+  const features = useStore(s => s.data.features);
+  const docId = useStore(s => s.ui.currentId);
+  const opts = useMemo(() => allTickets(features), [features]);
+  const ref = v.feat_ref as FeatRef | undefined;
+  const cur = opts.findIndex(o => sameRef(ref, refOf(o.f, o.tk)));
+  const pick = (i: number) => {
+    const o = opts[i];
+    if (!docId) return;
+    update(d => {
+      const doc = d.docs.find(x => x.id === docId);
+      if (!doc) return;
+      /* 前につながっていた切り分けのチケットからは、つながりを外す */
+      if (ref) {
+        const old = allTickets(d.features).find(x => sameRef(ref, refOf(x.f, x.tk)));
+        if (old && old.tk.cell.docId === docId) delete old.tk.cell.docId;
+      }
+      if (!o) { delete doc.v.feat_ref; doc.updatedAt = Date.now(); return; }
+      doc.v.feat_name = o.f.name.trim();
+      doc.v.feat_part = partOf(o.tk);
+      doc.v.feat_ref = refOf(o.f, o.tk);
+      const now = allTickets(d.features).find(x => sameRef(doc.v.feat_ref, refOf(x.f, x.tk)));
+      if (now) now.tk.cell.docId = docId;
+      doc.updatedAt = Date.now();
+    });
+  };
+  return (
+    <div className="node">
+      <div className="q">対象のフィーチャーは？(このチケットで実装するのは、フィーチャーのどの部分か)</div>
+      {opts.length > 0 && (
+        <select className="feat-pick" value={cur} aria-label="切り分けのチケットから選ぶ" onChange={e => pick(Number(e.target.value))}>
+          <option value={-1}>{cur < 0 ? "切り分けのチケットから選ぶ(選ぶと下の2つが入る)" : "つながりを外す"}</option>
+          {opts.map((o, i) => <option key={i} value={i}>{o.label}</option>)}
+        </select>
+      )}
+      {cur >= 0 && <p className="hint">切り分けのチケットとつながっている。実施状況は「フィーチャー」の切り分けで付ける。</p>}
+      <Field path={["feat_name"]} label="フィーチャー" ph="例: 書類のオンライン提出" />
+      <Field path={["feat_part"]} label="対象の部分(起点 / イベント / 開発領域)" ph="例: 書類提出画面 / 保存ボタン押下 / BE" />
+    </div>
+  );
 }

@@ -10,6 +10,8 @@ const be = (status = "", code = "") => ({ display: "表示しない", status, co
 const chk = (name: string, err = be(), detail = "") => ({ name, detail, err });
 const sample: Values = {
   title: "ファイルアップロード機能の構築（BE）",
+  feat_name: "書類のオンライン提出",
+  feat_part: "書類提出画面 / アップロードボタン押下 / BE",
   story_goal: "口座開設審査に必要な書類をオンラインでアップロードできる機能を提供したい",
   scope_in: ["書類をアップロードする基本的な機能"],
   scope_out: ["アップロードした書類の削除"],
@@ -35,7 +37,12 @@ const sample: Values = {
   branch: "開発ブランチはX面\nブランチ反映予定リンク"
 };
 
-const expected = `## ストーリー
+const expected = `## 対象のフィーチャー
+
+* フィーチャー：書類のオンライン提出
+* 対象：書類提出画面 / アップロードボタン押下 / BE
+
+## ストーリー
 
 * 口座開設審査に必要な書類をオンラインでアップロードできる機能を提供したい
    * 機能AのアップロードAPIを参照する（PUT：/account/applications/documents/:documentType）
@@ -127,6 +134,12 @@ describe("実装チケット", () => {
     /* サイズ超過の2件、編集不可の2件、正常時のステータス1件 */
     expect(r.missing).toBe(5);
     expect(r.blocks.map(b => [b.key, b.missing])).toEqual([["basic", 0], ["build", 0], ["ac", 5], ["notes", 0]]);
+  });
+
+  it("対象のフィーチャーが空なら未記入として数える", () => {
+    const r = buildTicket(GENRES.impl, { ...sample, feat_name: "", feat_part: "" });
+    expect(r.text).toContain("## 対象のフィーチャー\n\n* フィーチャー：【未記入】\n* 対象：【未記入】");
+    expect(r.blocks[0].missing).toBe(2);
   });
 
   it("スコープ外がないときは「なし」を選ぶと未記入にならない", () => {

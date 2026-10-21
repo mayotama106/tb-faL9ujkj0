@@ -1,7 +1,7 @@
 /* 実装チケットの本文。部品(components.ts)の組み合わせから、処理の流れと受け入れ条件を作る。
 
    チケットの入力値:
-     title, story_goal, story_refs[], mod                タイトルとストーリー
+     title, feat_name, feat_part, feat_ref, story_goal, story_refs[], mod   タイトル・対象のフィーチャー・ストーリー
      scope_in[], scope_out[], scope_out_none              スコープ(スコープ内とスコープ外)
      proc_name, blocks[]                                  組み立て(部品の並び)
      ok_status, ok_body, ac_extra[]                       受け入れ条件(正常時と追加分)
@@ -219,7 +219,9 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
   block("basic", () => {
     if (!t(v.title)) missing++;
     const refs = listItems(v.story_refs).flatMap(r => headed(1, r));
-    const out = ["## " + h.story, "", ...headed(0, req(v.story_goal)), ...refs];
+    /* フィーチャーのどの部分を実装するチケットか(切り分けから作ると自動で入る) */
+    const out = ["## " + h.feature, "", ...valued(0, "フィーチャー", req(v.feat_name)), ...valued(0, "対象", req(v.feat_part))];
+    out.push("", "## " + h.story, "", ...headed(0, req(v.story_goal)), ...refs);
     /* スコープはストーリーと同じ階層の節。スコープ外がないなら「なし」と明示する */
     const inn = listItems(v.scope_in), outs = listItems(v.scope_out);
     out.push("", "## " + h.scope, "### " + h.scopeIn, "");

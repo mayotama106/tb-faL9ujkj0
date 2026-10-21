@@ -70,6 +70,16 @@ export function ticketsOf(f: Feature): FTicket[] {
     items: itemsOf(ev, l), path: ["entries", i, "events", j, "cells", l]
   }))));
 }
+/* チケットが、フィーチャーのどの部分か(起点 / イベント / 開発領域) */
+export const partOf = (tk: FTicket) => entryLabel(tk.entry) + " / " + (t(tk.event.name) || MISSING) + " / " + tk.lname;
+/* 実装チケットから、つながっている切り分けのチケットを指す(並べ替えてもずれないように、位置ではなく鍵で持つ) */
+export interface FeatRef { featureId: string; entry: string; event: string; layer: Layer }
+export const refOf = (f: Feature, tk: FTicket): FeatRef => ({ featureId: f.id, entry: tk.entry._k, event: tk.event._k, layer: tk.layer });
+export const sameRef = (a: FeatRef | undefined, b: FeatRef) =>
+  !!a && a.featureId === b.featureId && a.entry === b.entry && a.event === b.event && a.layer === b.layer;
+export function allTickets(features: Feature[]): { f: Feature; tk: FTicket; label: string }[] {
+  return features.flatMap(f => ticketsOf(f).map(tk => ({ f, tk, label: (t(f.name) || MISSING) + " › " + partOf(tk) })));
+}
 /* チケットの内容(Excelの「内容」とプレビュー) */
 export function contentOf(tk: FTicket): string[] {
   return tk.items.map(it => tk.layer === "err"
@@ -130,7 +140,8 @@ export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
     blocks.push({ ...newBlock(COMPONENTS.screen, key), name: t(tk.entry.name), events: [{ _k: key(), name: t(tk.event.name), steps }] });
   return {
     _impl: 1, title: tk.title, story_goal: t(f.goal),
-    scope_in: [entryLabel(tk.entry) + " / " + (t(tk.event.name) || MISSING) + " の " + tk.lname], scope_out: [],
+    feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk),
+    scope_in: tk.items.map(it => t(it.name)).filter(Boolean), scope_out: [],
     proc_name: blocks.length || !steps.length ? "" : t(tk.event.name), blocks: blocks.length ? blocks : steps
   };
 }

@@ -75,6 +75,15 @@ describe("チケットの切り分け", () => {
     const err = buildTicket(GENRES.impl, docValues(f, tks[2], key)).text;
     expect(err).toContain("ファイル形式チェック(拡張子が.pdfでない)の場合");
   });
+  it("作ったチケットには、フィーチャーのどの部分かが入る", () => {
+    const f = base();
+    const tk = ticketsOf(f)[1];
+    const v = docValues(f, tk, key);
+    expect([v.feat_name, v.feat_part]).toEqual(["書類のオンライン提出", "書類提出画面 / 保存ボタン押下 / BE"]);
+    expect(v.feat_ref).toEqual({ featureId: "f", entry: "e1", event: "v1", layer: "be" });
+    expect(v.scope_in).toEqual(["書類の情報を登録"]);
+    expect(buildTicket(GENRES.impl, v).text).toContain("## 対象のフィーチャー\n\n* フィーチャー：書類のオンライン提出\n* 対象：書類提出画面 / 保存ボタン押下 / BE");
+  });
   it("結果の本文に、洗い出しの木と、状況付きのチケット一覧を出す", () => {
     const f = base();
     f.entries[0].events[0].cells.client.docId = "d1";

@@ -366,3 +366,4 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
 .drop-end.on { outline-color: rgba(161, 178, 214, 0.6); }
 .drop-end.hit { outline-color: var(--gold); background: rgba(180, 138, 90, 0.08); }
 .drop-label { position: absolute; right: 8px; top: -24px; z-index: 6; font-size: 12px; font-weight: 700; color: #fff; background: var(--gold); padding: 1px 8px; border-radius: 999px; pointer-events: none; }
+.feat-pick { font: inherit; width: 100%; padding: 8px 10px; margin: 4px 0 6px; border: 1px solid var(--mist); border-radius: 10px; background: var(--field); color: var(--navy); }
