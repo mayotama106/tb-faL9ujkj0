@@ -41,7 +41,9 @@ export const layerName = (ev: FEvent, l: Layer) => (!ev.split && l === "client" 
 export const itemLayer = (ev: FEvent, it: FItem): Layer => (!ev.split && it.layer === "bff" ? "client" : it.layer);
 
 const t = (s: unknown) => (typeof s === "string" ? s : "").trim();
-export const entryLabel = (e: FEntry) => (t(e.name) || MISSING) + (e.kind === "screen" ? "画面" : "");
+/* 画面の名前。「住所変更」でも「住所変更画面」でも、「住所変更画面」と書く */
+const screenBase = (name: string) => name.replace(/\s*画面$/, "");
+export const entryLabel = (e: FEntry) => (e.kind === "screen" ? (screenBase(t(e.name)) || MISSING) + "画面" : t(e.name) || MISSING);
 
 /* 画面はすべての開発領域、画面以外は BE とエラーハンドリングだけ */
 export function defaultCells(kind: EntryKind): Record<Layer, FCell> {
@@ -51,7 +53,9 @@ export function defaultCells(kind: EntryKind): Record<Layer, FCell> {
 export const newEvent = (kind: EntryKind, name: string, key: () => string): FEvent => ({ _k: key(), name, items: [], cells: defaultCells(kind) });
 /* 起点を足すときは、イベントも1つ足す(画面は「初期表示」) */
 export const newEntry = (kind: EntryKind, key: () => string): FEntry => ({ _k: key(), kind, name: "", events: [newEvent(kind, ENTRY_KINDS[kind].first, key)] });
-export const newItem = (kind: FItem["kind"], key: () => string): FItem => ({ _k: key(), kind, name: "", layer: kind === "check" ? "bff" : "be", err: "" });
+/* 画面のチェックは CLIENT・BFF、それ以外は BE から始める(画面を介さない処理は BE だけ) */
+export const newItem = (kind: FItem["kind"], key: () => string, entry: EntryKind = "screen"): FItem =>
+  ({ _k: key(), kind, name: "", layer: kind === "check" && entry === "screen" ? "bff" : "be", err: "" });
 
 /* チケット(オンの開発領域)の一覧 */
 export interface FTicket {
@@ -59,7 +63,7 @@ export interface FTicket {
   path: (string | number)[];   /* フィーチャーの中のマスの位置 */
 }
 export function defaultTitle(e: FEntry, ev: FEvent, l: Layer) {
-  return entryLabel(e) + " " + (t(ev.name) || MISSING) + "(" + layerName(ev, l) + ")";
+  return "【" + layerName(ev, l) + "】" + entryLabel(e) + " " + (t(ev.name) || MISSING) + "の実装";
 }
 export function itemsOf(ev: FEvent, l: Layer): FItem[] {
   return l === "err" ? ev.items.filter(it => it.err === "あり") : ev.items.filter(it => itemLayer(ev, it) === l);
@@ -83,8 +87,8 @@ export function allTickets(features: Feature[]): { f: Feature; tk: FTicket; labe
 /* チケットの内容(Excelの「内容」とプレビュー) */
 export function contentOf(tk: FTicket): string[] {
   return tk.items.map(it => tk.layer === "err"
-    ? (t(it.name) || MISSING) + (t(it.errNote) ? ": " + t(it.errNote) : "")
-    : ITEM_KINDS[it.kind] + ": " + (t(it.name) || MISSING));
+    ? (t(it.name) || MISSING) + (t(it.errNote) ? "：" + t(it.errNote) : "")
+    : ITEM_KINDS[it.kind] + "：" + (t(it.name) || MISSING));
 }
 
 /* 確認事項(漏れ・決まっていないこと)。part は直すパート */
@@ -92,7 +96,7 @@ export interface Issue { part: "parts" | "split"; text: string }
 export function issuesOf(f: Feature): Issue[] {
   const out: Issue[] = [];
   if (!t(f.name)) out.push({ part: "parts", text: "フィーチャーの名前が未記入" });
-  if (!f.entries.length) out.push({ part: "parts", text: "起点(画面など)が1つもない" });
+  if (!f.entries.length) out.push({ part: "parts", text: "画面・処理が1つもない" });
   f.entries.forEach(e => {
     const k = ENTRY_KINDS[e.kind];
     if (!t(e.name)) out.push({ part: "parts", text: k.name + "の名前が未記入" });
@@ -101,12 +105,12 @@ export function issuesOf(f: Feature): Issue[] {
       const where = entryLabel(e) + " / " + (t(ev.name) || MISSING);
       if (!t(ev.name)) out.push({ part: "parts", text: entryLabel(e) + "の" + k.event + "の名前が未記入" });
       ev.items.forEach(it => {
-        const name = where + " / " + (t(it.name) || MISSING);
+        const name = "「" + (t(it.name) || MISSING) + "」（" + where + "）";
         if (!t(it.name)) out.push({ part: "parts", text: where + "の" + ITEM_KINDS[it.kind] + "の名前が未記入" });
-        if (!it.err) out.push({ part: "parts", text: name + "のエラーハンドリングの有無が未定" });
+        if (!it.err) out.push({ part: "parts", text: name + "：エラーハンドリングの有無が未定" });
         const l = layerName(ev, itemLayer(ev, it));
-        if (!ev.cells[itemLayer(ev, it)]?.on) out.push({ part: "split", text: name + "は" + l + "で実装するが、" + l + "のチケットがない" });
-        if (it.err === "あり" && !ev.cells.err?.on) out.push({ part: "split", text: name + "はエラーハンドリングありだが、エラーハンドリングのチケットがない" });
+        if (!ev.cells[itemLayer(ev, it)]?.on) out.push({ part: "split", text: name + "：" + l + "で実装するが、" + l + "のチケットがない" });
+        if (it.err === "あり" && !ev.cells.err?.on) out.push({ part: "split", text: name + "：エラーハンドリングありだが、エラーハンドリングのチケットがない" });
       });
       if (!layersOf(ev).some(l => ev.cells[l]?.on)) out.push({ part: "split", text: where + "のチケットが1つもない" });
     });
@@ -127,23 +131,37 @@ export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
   let checks: Values | null = null;
   tk.items.forEach(it => {
     if (tk.layer === "err") {
-      steps.push({ ...newBlock(COMPONENTS.error, key), when: (t(it.name) || MISSING) + (t(it.errNote) ? "(" + t(it.errNote) + ")" : "") + "の場合", err: {} });
+      steps.push({ ...newBlock(COMPONENTS.error, key), when: (t(it.name) || MISSING) + (t(it.errNote) ? "（" + t(it.errNote) + "）" : "") + "の場合", err: {} });
     } else if (it.kind === "check") {
-      if (!checks) { checks = { ...newBlock(COMPONENTS.check, key), name: t(tk.event.name) + "のチェック", items: [] }; steps.push(checks); }
+      if (!checks) { checks = { ...newBlock(COMPONENTS.check, key), name: "", items: [] }; steps.push(checks); }
       (checks.items as Values[]).push({ _k: key(), name: t(it.name), detail: "", err: {} });
     } else {
-      steps.push({ ...newBlock(COMPONENTS.do, key), name: t(it.name) });
+      steps.push({ ...newBlock(COMPONENTS[compOf(t(it.name))], key), name: t(it.name) });
     }
   });
+  /* チェックが1つならその名前を、複数なら「〇〇時のチェック」をチェック群の名前にする */
+  if (checks) {
+    const c = checks as Values, items = c.items as Values[];
+    c.name = items.length === 1 ? items[0].name : (t(tk.event.name) || MISSING) + "時のチェック";
+  }
   const blocks: Values[] = [];
   if (tk.layer === "client" && tk.entry.kind === "screen")
-    blocks.push({ ...newBlock(COMPONENTS.screen, key), name: t(tk.entry.name), events: [{ _k: key(), name: t(tk.event.name), steps }] });
+    blocks.push({ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)), events: [{ _k: key(), name: t(tk.event.name), steps }] });
   return {
     _impl: 1, title: tk.title, story_goal: t(f.goal),
     feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk),
     scope_in: tk.items.map(it => t(it.name)).filter(Boolean), scope_out: [],
     proc_name: blocks.length || !steps.length ? "" : t(tk.event.name), blocks: blocks.length ? blocks : steps
   };
+}
+
+/* ロジックの名前から部品を選ぶ(住所を更新 → 更新 など)。当てはまらなければ処理実行 */
+export function compOf(name: string): string {
+  if (/削除/.test(name)) return "delete";
+  if (/更新|変更/.test(name)) return "update";
+  if (/登録|作成|追加|保存/.test(name)) return "create";
+  if (/取得|検索|参照|読み込/.test(name)) return "get";
+  return "do";
 }
 
 /* 切り分けの結果(プレビューに出す本文)。確認事項の件数を未記入として数える */
@@ -153,23 +171,24 @@ export function buildFeature(f: Feature, docMissing: (id: string) => number | nu
   const tks = ticketsOf(f);
   const c = statusCount(tks);
   const blocks: Block[] = [];
-  const tree: string[] = ["## " + (t(f.name) || MISSING), "", "チケット " + tks.length + " 件(" + STATUSES.map(s => s + " " + c[s]).join("・") + ")", "", "## 洗い出し", ""];
+  const tree: string[] = ["## " + (t(f.name) || MISSING), "", "チケット" + tks.length + "件（" + STATUSES.map(s => s + c[s]).join("・") + "）", "", "## 洗い出し", ""];
   if (!f.entries.length) tree.push(bullet(0, MISSING));
   f.entries.forEach(e => {
     const k = ENTRY_KINDS[e.kind];
-    tree.push(bullet(0, (e.kind === "screen" ? "" : "[" + k.name + "] ") + entryLabel(e)));
+    tree.push(bullet(0, (e.kind === "screen" ? "" : "［" + k.name + "］") + entryLabel(e)));
     e.events.forEach(ev => {
-      tree.push(bullet(1, k.event + ": " + (t(ev.name) || MISSING)));
-      ev.items.forEach(it => tree.push(bullet(2, ITEM_KINDS[it.kind] + ": " + (t(it.name) || MISSING) +
-        "(" + layerName(ev, itemLayer(ev, it)) + "・エラーハンドリング: " + (it.err || "未定") + ")")));
+      tree.push(bullet(1, k.event + "：" + (t(ev.name) || MISSING)));
+      /* 開発領域とエラーハンドリングは［ ］にまとめ、「／」で区切る(名前の括弧や CLIENT・BFF の「・」とぶつからないように) */
+      ev.items.forEach(it => tree.push(bullet(2, ITEM_KINDS[it.kind] + "：" + (t(it.name) || MISSING) +
+        "［" + layerName(ev, itemLayer(ev, it)) + "／エラーハンドリング" + (it.err || "未定") + "］")));
     });
   });
   blocks.push({ key: "parts", missing: issues.filter(i => i.part === "parts").length, lines: tree });
   const sp: string[] = ["", "## チケット", ""];
-  if (!tks.length) sp.push(MISSING);
+  if (!tks.length) sp.push(bullet(0, MISSING));
   tks.forEach((tk, i) => {
     const m = tk.cell.docId ? docMissing(tk.cell.docId) : null;
-    sp.push((i + 1) + ". [" + (tk.cell.status || "未着手") + "] " + tk.title + (tk.cell.docId && m != null ? "(ビルダー: " + (m ? "未記入 " + m : "記入済み") + ")" : ""));
+    sp.push((i + 1) + ". ［" + (tk.cell.status || "未着手") + "］" + tk.title + (tk.cell.docId && m != null ? "（チケット本文：" + (m ? "未記入" + m + "件" : "記入済み") + "）" : ""));
     contentOf(tk).forEach(x => sp.push(bullet(1, x)));
   });
   if (issues.length) sp.push("", "### 確認事項", "", ...issues.map(i => bullet(0, i.text)));
@@ -178,7 +197,7 @@ export function buildFeature(f: Feature, docMissing: (id: string) => number | nu
 }
 
 /* Excelの表(1行目が見出し、1チケット1行) */
-export const EXCEL_HEADER = ["No", "フィーチャー", "起点の種類", "起点", "イベント", "開発領域", "チケットタイトル", "内容(チェック・ロジック)", "実施状況"];
+export const EXCEL_HEADER = ["No", "フィーチャー", "種類", "画面・処理名", "イベント", "開発領域", "チケットタイトル", "内容（チェック・ロジック）", "実施状況"];
 export function excelRows(features: Feature[]): string[][] {
   const rows: string[][] = [EXCEL_HEADER];
   features.forEach(f => ticketsOf(f).forEach(tk => rows.push([

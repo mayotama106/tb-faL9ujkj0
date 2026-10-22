@@ -1,8 +1,8 @@
 /* チケットの切り分け: 起点 → イベント → 開発領域ごとのチケット、実施状況、Excelの表 */
 import { describe, expect, it } from "vitest";
-import { buildFeature, defaultCells, docValues, excelRows, EXCEL_HEADER, issuesOf, migrateFeature, newEntry, statusCount, ticketsOf, type Feature } from "./feature";
+import { buildFeature, compOf, defaultCells, entryLabel, newItem, docValues, excelRows, EXCEL_HEADER, issuesOf, migrateFeature, newEntry, statusCount, ticketsOf, type Feature } from "./feature";
 import { GENRES } from "./genres";
-import { buildTicket } from "./ticket";
+import { buildTicket, type Values } from "./ticket";
 import { buildXlsx, colName } from "./xlsx";
 
 let n = 0;
@@ -32,9 +32,9 @@ describe("チケットの切り分け", () => {
   it("チケットはイベント×開発領域。CLIENT・BFF は既定で1チケット。エラーハンドリングのチケットには、ありのものが入る", () => {
     const tks = ticketsOf(base());
     expect(tks.map(tk => tk.title)).toEqual([
-      "書類提出画面 保存ボタン押下(CLIENT・BFF)", "書類提出画面 保存ボタン押下(BE)", "書類提出画面 保存ボタン押下(エラーハンドリング)",
-      "書類提出画面 初期表示(CLIENT・BFF)", "書類提出画面 初期表示(BE)", "書類提出画面 初期表示(エラーハンドリング)",
-      "審査ステータス更新バッチ 毎日0時に起動(BE)", "審査ステータス更新バッチ 毎日0時に起動(エラーハンドリング)"]);
+      "【CLIENT・BFF】書類提出画面 保存ボタン押下の実装", "【BE】書類提出画面 保存ボタン押下の実装", "【エラーハンドリング】書類提出画面 保存ボタン押下の実装",
+      "【CLIENT・BFF】書類提出画面 初期表示の実装", "【BE】書類提出画面 初期表示の実装", "【エラーハンドリング】書類提出画面 初期表示の実装",
+      "【BE】審査ステータス更新バッチ 毎日0時に起動の実装", "【エラーハンドリング】審査ステータス更新バッチ 毎日0時に起動の実装"]);
     expect(tks[2].items.map(it => it.name)).toEqual(["ファイル形式チェック", "書類の情報を登録"]);
     expect(tks[0].items.map(it => it.name)).toEqual(["ファイル形式チェック"]);
   });
@@ -50,8 +50,8 @@ describe("チケットの切り分け", () => {
     const f = base();
     f.entries[0].events[0].cells.client.on = false;
     const iss = issuesOf(f).map(i => i.text);
-    expect(iss).toContain("審査ステータス更新バッチ / 毎日0時に起動 / 審査結果を反映のエラーハンドリングの有無が未定");
-    expect(iss).toContain("書類提出画面 / 保存ボタン押下 / ファイル形式チェックはCLIENT・BFFで実装するが、CLIENT・BFFのチケットがない");
+    expect(iss).toContain("「審査結果を反映」（審査ステータス更新バッチ / 毎日0時に起動）：エラーハンドリングの有無が未定");
+    expect(iss).toContain("「ファイル形式チェック」（書類提出画面 / 保存ボタン押下）：CLIENT・BFFで実装するが、CLIENT・BFFのチケットがない");
   });
   it("実施状況を数え、Excelの表は1チケット1行", () => {
     const f = base();
@@ -61,9 +61,9 @@ describe("チケットの切り分け", () => {
     const rows = excelRows([f]);
     expect(rows[0]).toEqual(EXCEL_HEADER);
     expect(rows).toHaveLength(9);
-    expect(rows[1]).toEqual(["1", "書類のオンライン提出", "画面", "書類提出画面", "保存ボタン押下", "CLIENT・BFF", "書類提出画面の保存", "チェック: ファイル形式チェック", "未着手"]);
-    expect(rows[3]).toEqual(["3", "書類のオンライン提出", "画面", "書類提出画面", "保存ボタン押下", "エラーハンドリング", "書類提出画面 保存ボタン押下(エラーハンドリング)",
-      "ファイル形式チェック: 拡張子が.pdfでない\n書類の情報を登録", "未着手"]);
+    expect(rows[1]).toEqual(["1", "書類のオンライン提出", "画面", "書類提出画面", "保存ボタン押下", "CLIENT・BFF", "書類提出画面の保存", "チェック：ファイル形式チェック", "未着手"]);
+    expect(rows[3]).toEqual(["3", "書類のオンライン提出", "画面", "書類提出画面", "保存ボタン押下", "エラーハンドリング", "【エラーハンドリング】書類提出画面 保存ボタン押下の実装",
+      "ファイル形式チェック：拡張子が.pdfでない\n書類の情報を登録", "未着手"]);
     expect(rows[2][8]).toBe("完了");
   });
   it("チケットからビルダーのチケットを作ると、チェック・ロジックが部品になる", () => {
@@ -73,7 +73,11 @@ describe("チケットの切り分け", () => {
     expect(front).toContain("## 書類提出画面");
     expect(front).toContain("ファイル形式チェック");
     const err = buildTicket(GENRES.impl, docValues(f, tks[2], key)).text;
-    expect(err).toContain("ファイル形式チェック(拡張子が.pdfでない)の場合");
+    expect(err).toContain("ファイル形式チェック（拡張子が.pdfでない）の場合");
+    /* チェックが1つならその名前がチェック群の名前になり、ロジックは名前から部品を選ぶ(登録 → 登録の部品) */
+    const be = docValues(f, tks[1], key);
+    expect(be.blocks.map((b: Values) => b.type)).toEqual(["create"]);
+    expect(docValues(f, tks[0], key).blocks[0].events[0].steps[0].name).toBe("ファイル形式チェック");
   });
   it("作ったチケットには、フィーチャーのどの部分かが入る", () => {
     const f = base();
@@ -89,8 +93,9 @@ describe("チケットの切り分け", () => {
     f.entries[0].events[0].cells.client.docId = "d1";
     const r = buildFeature(f, id => (id === "d1" ? 3 : null));
     expect(r.blocks.map(b => b.key)).toEqual(["parts", "split"]);
-    expect(r.text).toContain("* [バッチ・定期実行] 審査ステータス更新バッチ");
-    expect(r.text).toContain("1. [未着手] 書類提出画面 保存ボタン押下(CLIENT・BFF)(ビルダー: 未記入 3)");
+    expect(r.text).toContain("* ［バッチ・定期実行］審査ステータス更新バッチ\n   * 実行のきっかけ：毎日0時に起動\n      * ロジック：審査結果を反映［BE／エラーハンドリング未定］");
+    expect(r.text).toContain("チケット8件（未着手8・進行中0・レビュー中0・完了0）");
+    expect(r.text).toContain("1. ［未着手］【CLIENT・BFF】書類提出画面 保存ボタン押下の実装（チケット本文：未記入3件）");
   });
   it("前の形のフィーチャーを読み込める", () => {
     const f = migrateFeature({ id: "x", name: "古い", tickets: [{ title: "a" }], scope_in: ["s"],
@@ -117,5 +122,19 @@ describe("Excel", () => {
     /* 終端レコード */
     const end = bytes.length - 22;
     expect(new DataView(bytes.buffer).getUint32(end, true)).toBe(0x06054b50);
+  });
+});
+
+describe("名前と部品の推定", () => {
+  it("画面の名前に「画面」が付いていても重ねない", () => {
+    expect(entryLabel({ _k: "e", kind: "screen", name: "住所変更画面", events: [] })).toBe("住所変更画面");
+    expect(entryLabel({ _k: "e", kind: "screen", name: "住所変更", events: [] })).toBe("住所変更画面");
+  });
+  it("ロジックの名前から部品を選ぶ", () => {
+    expect(["住所を更新", "履歴を登録", "住所を検索", "書類を削除", "メールを送信"].map(compOf)).toEqual(["update", "create", "get", "delete", "do"]);
+  });
+  it("画面を介さない処理のチェックは BE から始める", () => {
+    expect(newItem("check", key, "batch").layer).toBe("be");
+    expect(newItem("check", key).layer).toBe("bff");
   });
 });

@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ENTRY_KINDS, EXCEL_HEADER, FRONT, ITEM_KINDS, LAYERS, STATUSES, layerName, layersOf, buildFeature, contentOf, defaultTitle, docValues,
-  excelRows, issuesOf, newEntry, newEvent, newItem, statusCount, ticketsOf,
+  entryLabel, excelRows, issuesOf, newEntry, newEvent, newItem, statusCount, ticketsOf,
   type EntryKind, type FEntry, type FEvent, type FItem, type Feature, type FTicket, type Layer, type Status
 } from "../domain/feature";
+import { MISSING } from "../domain/genres";
 import { buildTicket } from "../domain/ticket";
 import { buildXlsx, downloadXlsx } from "../domain/xlsx";
 import { ensureKeys } from "../state/persist";
@@ -177,6 +178,7 @@ function PartsEditor({ f }: { f: Feature }) {
   };
   return <>
     <FText path={["name"]} label="フィーチャーの名前は？" ph="例: 口座開設書類のオンライン提出" />
+    <FText path={["goal"]} label="何のためのフィーチャー？(誰に、どんな価値を。作ったチケットのストーリーになります)" ph="例: 会員が住所変更画面から、自分の住所をオンラインで変更できるようにしたい" />
     <div className="guide">
       <div className="q">漏れなく洗い出す</div>
       <ul>
@@ -247,7 +249,7 @@ function EventView({ e, ev, i, j, handle }: { e: FEntry; ev: FEvent; i: number; 
   const base: Path = ["entries", i, "events", j];
   const add = (kind: FItem["kind"]) => {
     focusLater(fid([...base, "items", ev.items.length, "name"]));
-    editFeature(ff => { ff.entries[i].events[j].items.push(newItem(kind, newId)); });
+    editFeature(ff => { ff.entries[i].events[j].items.push(newItem(kind, newId, e.kind)); });
   };
   return (
     <div className="row-card">
@@ -259,7 +261,7 @@ function EventView({ e, ev, i, j, handle }: { e: FEntry; ev: FEvent; i: number; 
       </div>
       <Kids>
         <SortableList ids={ev.items.map(it => it._k)} onMove={(a, b) => editFeature(ff => move(ff.entries[i].events[j].items, a, b))}>
-          {(_id, n, h) => <ItemView it={ev.items[n]} split={!!ev.split} path={[...base, "items", n]} n={n} handle={h} onDelete={() => removeAt([...base, "items"], n, ITEM_KINDS[ev.items[n].kind])} />}
+          {(_id, n, h) => <ItemView it={ev.items[n]} split={!!ev.split} screen={e.kind === "screen"} path={[...base, "items", n]} n={n} handle={h} onDelete={() => removeAt([...base, "items"], n, ITEM_KINDS[ev.items[n].kind])} />}
         </SortableList>
         <div className="links">
           <button type="button" className="etc-btn pal-data" onClick={() => add("check")}>＋ チェック</button>
@@ -270,7 +272,7 @@ function EventView({ e, ev, i, j, handle }: { e: FEntry; ev: FEvent; i: number; 
   );
 }
 
-function ItemView({ it, split, path, n, handle, onDelete }: { it: FItem; split: boolean; path: Path; n: number; handle: ReactNode; onDelete: () => void }) {
+function ItemView({ it, split, screen, path, n, handle, onDelete }: { it: FItem; split: boolean; screen: boolean; path: Path; n: number; handle: ReactNode; onDelete: () => void }) {
   const name = ITEM_KINDS[it.kind];
   return (
     <div className="check-item">
@@ -282,7 +284,7 @@ function ItemView({ it, split, path, n, handle, onDelete }: { it: FItem; split: 
       </div>
       <div className="err-row">
         <span className="lbl">開発領域</span>
-        {split
+        {!screen && it.layer === "be" ? <span className="fixed-layer">BE</span> : split
           ? (["client", "bff", "be"] as const).map(l => <Chip key={l} on={it.layer === l} onClick={() => setF([...path, "layer"], l, false)}>{LAYERS[l]}</Chip>)
           : <>
             <Chip on={it.layer !== "be"} onClick={() => { if (it.layer === "be") setF([...path, "layer"], it.kind === "check" ? "bff" : "client", false); }}>{FRONT}</Chip>
@@ -316,14 +318,15 @@ function SplitEditor({ f }: { f: Feature }) {
     </div>
     {f.entries.map((e, i) => (
       <div key={e._k} className="split-entry">
-        <div className="q">{(e.kind === "screen" ? "" : "[" + ENTRY_KINDS[e.kind].name + "] ") + (e.name.trim() || "(名前なし)") + (e.kind === "screen" ? "画面" : "")}</div>
+        <div className="q">{(e.kind === "screen" ? "" : "［" + ENTRY_KINDS[e.kind].name + "］") + entryLabel(e)}</div>
         {e.events.map((ev, j) => (
           <div key={ev._k} className="split-event">
             <div className="split-ev-name">
-              <span>{ENTRY_KINDS[e.kind].event}: {ev.name.trim() || "(名前なし)"}</span>
-              <button type="button" className="link small" onClick={() => toggleSplit(["entries", i, "events", j])}>
-                {ev.split ? FRONT + "を1チケットにまとめる" : "CLIENTとBFFを分ける"}</button>
-              {layersOf(ev).filter(l => !ev.cells[l]?.on).map(l => (
+              <span>{ENTRY_KINDS[e.kind].event}：{ev.name.trim() || MISSING}</span>
+              {/* CLIENT・BFF は画面のときだけ(画面を介さない処理は BE とエラーハンドリング) */}
+              {e.kind === "screen" && <button type="button" className="link small" onClick={() => toggleSplit(["entries", i, "events", j])}>
+                {ev.split ? FRONT + "を1チケットにまとめる" : "CLIENTとBFFを分ける"}</button>}
+              {layersOf(ev).filter(l => !ev.cells[l]?.on && (e.kind === "screen" || l === "be" || l === "err")).map(l => (
                 <button key={l} type="button" className="etc-btn small-btn" title="削除したチケットを戻す"
                   onClick={() => setF(["entries", i, "events", j, "cells", l, "on"], true, false)}>＋ {layerName(ev, l)}</button>
               ))}

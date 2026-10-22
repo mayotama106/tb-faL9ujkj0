@@ -5,6 +5,7 @@ import {
   type CaseVal, type CompDef, type FieldDef
 } from "../domain/components";
 import type { Values } from "../domain/ticket";
+import { displayOf } from "../domain/impl";
 import { checkMove, moveBlock, type Spot } from "../domain/moveBlock";
 import { currentDoc, defsOf, editDoc, getAt, getState, newId, setAt, setValue, toast, useStore } from "../state/store";
 import { BlockDnd, DndBlock, DropEnd, useBlockDnd } from "./BlockDnd";
@@ -184,12 +185,17 @@ function CaseView({ f, path }: { f: FieldDef; path: Path }) {
 /* エラーハンドリング。表示タイプ、HTTPステータス、エラーコード、エラーメッセージ。該当しない欄は「なし」 */
 export function ErrorEditor({ path }: { path: Path }) {
   const e: Values = useVAt(path) || {};
-  const display = e.display || "";
+  const featPart = useVAt(["feat_part"]);
+  /* BE のチケットは、空なら「表示しない」として扱う(本文も同じ) */
+  const display = displayOf(e, { feat_part: featPart });
   return (
     <div className="err-ed">
       <div className="err-row">
-        <span className="lbl">表示タイプ</span>
-        <Chips path={[...path, "display"]} label="表示タイプ" options={DISPLAYS} />
+        <span className="lbl">表示</span>
+        <div className="chips" role="group" aria-label="表示">
+          {DISPLAYS.map(o => <button key={o} type="button" className="chip" aria-pressed={display === o}
+            onClick={() => setValue([...path, "display"], e.display === o ? "" : o, false)}>{o}</button>)}
+        </div>
       </div>
       <div className="err-row">
         <span className="lbl">HTTPステータス</span><CodeInput path={[...path, "status"]} kind="status" />

@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { COMPONENTS, NA, fillAc, toCan } from "./components";
 import { GENRES } from "./genres";
-import { collectAc } from "./impl";
+import { collectAc, scopeFromBlocks } from "./impl";
 import { buildTicket, type Values } from "./ticket";
 import { toImpl, upgradeImpl } from "../state/migrateImpl";
 
@@ -183,6 +183,19 @@ describe("実装チケット", () => {
     expect(r.text).toContain("   * 対象が見つからない場合、エラーを返却すること");
     expect(r.text).not.toContain("一部の対象で失敗した場合");
     expect(r.blocks.find(b => b.key === "build")!.missing).toBe(1);   /* 処理の名前だけ */
+  });
+
+  it("対象の部分が BE のチケットは、エラーの表示が空なら「表示しない」として扱う", () => {
+    const v: Values = { feat_part: "住所変更画面 / 変更ボタン押下 / BE", blocks: [{ type: "auth", name: "ログイン確認", how: "トークン", unauth: { status: "401", code: "E1" } }] };
+    const r = buildTicket(GENRES.impl, v);
+    expect(r.text).toContain("   * 認証できない場合\n      * HTTPステータス：401\n      * エラーコード：E1");
+    expect(r.text).not.toContain("表示：");
+    expect(buildTicket(GENRES.impl, { ...v, feat_part: "住所変更画面 / 変更ボタン押下 / CLIENT・BFF" }).text).toContain("* 表示：【未記入】");
+  });
+
+  it("スコープ内の案は、いちばん外の部品の見出し(入れ物は「〇〇API」)", () => {
+    expect(scopeFromBlocks(COMPONENTS, { blocks: [{ type: "api", name: "住所変更" }, { type: "do", name: "メールを送信\n詳細" }, { type: "check", name: "" }] }))
+      .toEqual(["住所変更API", "メールを送信"]);
   });
 
   it("APIの「項目と型」と「必須/任意」は、読み込み時に「項目」1つにまとめる", () => {

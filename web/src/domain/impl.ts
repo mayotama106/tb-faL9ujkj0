@@ -20,6 +20,20 @@ const linesOf = (s: unknown) => t(s).split("\n").map(l => l.trim()).filter(Boole
 const arr = (x: unknown): Values[] => (Array.isArray(x) ? x : []);
 const headOf = (fields: FieldDef[]) => fields.find(f => f.head);
 const usable = (f: FieldDef, o: Values) => !f.when || o[f.when.id] === f.when.eq;
+/* 対象の部分が BE のチケットは、エラーの表示を決めないので、空なら「表示しない」として扱う */
+export const isBeTicket = (v: Values) => /(^|[/／])\s*BE\s*$/.test(t(v.feat_part));
+export const displayOf = (e: ErrVal | undefined, v: Values) => t(e && e.display) || (isBeTicket(v) ? NO_DISPLAY : "");
+
+/* スコープ内の案。組み立てのいちばん外の部品の見出し(入れ物は「〇〇API」など) */
+export function scopeFromBlocks(defs: Defs, v: Values): string[] {
+  return arr(v.blocks).map(b => {
+    const def = defs[b.type];
+    const hf = def && headOf(def.fields);
+    const name = hf ? linesOf(b[hf.id])[0] || "" : "";
+    return name && def.container ? name + (def.suffix || "") : name;
+  }).filter(Boolean);
+}
+
 export const isEmptyErr = (e: ErrVal | undefined) => !e || !["display", "status", "code", "message", "note"].some(k => t((e as Values)[k]));
 
 /* 受け入れ条件。部品1つにつき1件(lead)を作り、その下にエラーハンドリングと「〇〇の場合」を並べる。
@@ -278,7 +292,7 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
   /* エラーの内容。「なし」の欄は出さない。表示しない場合はエラーメッセージを問わない */
   function errLines(e: ErrVal, d: number): string[] {
     const out: string[] = [];
-    const display = t(e.display);
+    const display = displayOf(e, v);
     if (!display) out.push(bullet(d, "表示：" + miss()));
     else if (display !== NO_DISPLAY) out.push(bullet(d, "表示：" + display));
     ([["status", "HTTPステータス"], ["code", "エラーコード"], ["message", "エラーメッセージ"]] as const).forEach(([k, label]) => {

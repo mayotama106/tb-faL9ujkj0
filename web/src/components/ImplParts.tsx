@@ -2,9 +2,9 @@
 import { useMemo } from "react";
 import { allTickets, partOf, refOf, sameRef, type FeatRef } from "../domain/feature";
 import { MOD, NEW, type Genre, type QNode } from "../domain/genres";
-import { collectAc } from "../domain/impl";
+import { collectAc, scopeFromBlocks } from "../domain/impl";
 import { headsOf, type Values } from "../domain/ticket";
-import { defsOf, update, useStore } from "../state/store";
+import { defsOf, setValue, update, useStore } from "../state/store";
 import { BlockList, CodeLists, ErrorEditor } from "./Blocks";
 import { Chips, Field, useV } from "./Fields";
 import { ListControl } from "./Steps";
@@ -27,6 +27,7 @@ export function ImplPart({ g, partKey }: { g: Genre; partKey: string }) {
       <div className="node">
         <div className="q">{h.scopeIn}は？(本チケットで実装すること。1件ずつ)</div>
         <ListControl node={listNode("scope_in", h.scopeIn, "例: 書類をアップロードする基本的な機能")} />
+        <ScopeFromBlocks />
       </div>
       <div className="node">
         <div className="q">{h.scopeOut}は？(本チケットでは実装しないこと。1件ずつ)</div>
@@ -137,6 +138,21 @@ function FeaturePick() {
       {cur >= 0 && <p className="hint">切り分けのチケットとつながっている。実施状況は「フィーチャー」の切り分けで付ける。</p>}
       <Field path={["feat_name"]} label="フィーチャー" ph="例: 書類のオンライン提出" />
       <Field path={["feat_part"]} label="対象の部分(起点 / イベント / 開発領域)" ph="例: 書類提出画面 / 保存ボタン押下 / BE" />
+    </div>
+  );
+}
+
+/* 組み立てを直したあと、スコープ内を部品の見出しに合わせて作り直す */
+function ScopeFromBlocks() {
+  const v = useV();
+  const defs = useStore(s => defsOf(s.data));
+  const next = scopeFromBlocks(defs, v);
+  const cur = (Array.isArray(v.scope_in) ? v.scope_in : []).map((x: unknown) => String(x).trim()).filter(Boolean);
+  if (!next.length || next.join("\n") === cur.join("\n")) return null;
+  return (
+    <div className="scope-sync">
+      <span className="hint">組み立ての部品と、スコープ内が合っていません。</span>
+      <button type="button" className="plain small-btn" onClick={() => setValue(["scope_in"], next, false)}>組み立ての部品から作り直す（{next.join("、")}）</button>
     </div>
   );
 }
