@@ -27,7 +27,14 @@ export const isEmptyErr = (e: ErrVal | undefined) => !e || !["display", "status"
 export interface AcCase { label: string; err?: ErrVal; path?: Path }
 export interface AcGroup { lead: string; cases: AcCase[] }
 
-const endKoto = (s: string) => (/(こと|。)$/.test(s) ? s : s + "こと");
+/* 文を「〜こと」で終える。動詞・助動詞で終わるなら「こと」を、名詞(返却 など)で終わるなら「すること」を付ける */
+export function toKoto(raw: string): string {
+  const s = raw.replace(/[。．.]+$/, "");
+  if (!s || /こと$/.test(s)) return s;
+  if (/[うくぐすつぬぶむるたい]$/.test(s)) return s + "こと";
+  if (/[\u4e00-\u9fff\u30a0-\u30ff]$/.test(s)) return s + "すること";   /* 漢字・カタカナ(返却、スキップ など) */
+  return s + "とすること";
+}
 
 /* 部品の並びから、受け入れ条件を集める */
 export function collectAc(defs: Defs, v: Values): AcGroup[] {
@@ -50,8 +57,9 @@ export function collectAc(defs: Defs, v: Values): AcGroup[] {
     const own = t(b.ac) ? [t(b.ac)] : (def.ac || []).map(a => fillAc(a, def, b, MISSING));
     const leads = own.length ? own : [((headOf(def.fields) && t(b[headOf(def.fields)!.id]).split("\n")[0]) || MISSING)];
     const withCase = (s: string) => (caseLabel ? caseLabel + "、" + s : s);
-    const lead = withCase(leads[0]);
-    group(lead);
+    /* 受け入れ条件を持たない部品(API作成)は、中のエラーがあるときだけ見出しを作る */
+    const lead = own.length || !def.container ? withCase(leads[0]) : leads[0] + (def.suffix || "");
+    if (own.length || !def.container) group(lead);
     leads.slice(1).forEach(l => group(withCase(l)));
     const fields = (fs: FieldDef[], o: Values, op: Path, rowName?: string) => fs.forEach(f => {
       if (!usable(f, o)) return;
@@ -62,7 +70,7 @@ export function collectAc(defs: Defs, v: Values): AcGroup[] {
       } else if (f.kind === "case") {
         const cv: CaseVal = o[f.id] || {};
         if (cv.mode === "error") push(lead, { label, err: cv.err || {}, path: [...op, f.id, "err"] });
-        else if (cv.mode === "text" && t(cv.text)) push(lead, { label: label + "、" + endKoto(t(cv.text).split("\n")[0]) });
+        else if (cv.mode === "text" && t(cv.text)) push(lead, { label: label + "、" + toKoto(t(cv.text).split("\n")[0]) });
       } else if (f.kind === "group") {
         if (!(f.ref && o[f.id + "_ref"])) fields(f.fields || [], o, op);
       } else if (f.kind === "rows") {
@@ -130,6 +138,7 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
         const cv: CaseVal = val || {};
         if (cv.mode === "error") return [bullet(d, f.label + "：" + errorHead(cv.err))];
         if (cv.mode === "text") return valued(d, f.label, t(cv.text) || miss());
+        if (cv.mode === "na") return [];
         return empty();
       }
       case "blocks": {
@@ -183,7 +192,7 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
         const top = numbered ? ind(d) + (i + 1) + ". " + (ls[0] || "") : bullet(d, ls[0] || "");
         return [top].concat(ls.slice(1).map(l => bullet(d + 1, l)));
       };
-      if (!def) return first("(不明な部品: " + b.type + ")");
+      if (!def) return first("（不明な部品：" + b.type + "）");
       if (def.type === "error") {
         const e: ErrVal = b.err || {};
         return first((t(b.when) ? t(b.when) + "は" : "") + errorHead(e)).concat(t(e.note) ? valued(d + 1, "補足", e.note || "") : []);
@@ -218,10 +227,11 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
 
   block("basic", () => {
     if (!t(v.title)) missing++;
-    const refs = listItems(v.story_refs).flatMap(r => headed(1, r));
+    const refs = listItems(v.story_refs);
     /* フィーチャーのどの部分を実装するチケットか(切り分けから作ると自動で入る) */
     const out = ["## " + h.feature, "", ...valued(0, "フィーチャー", req(v.feat_name)), ...valued(0, "対象", req(v.feat_part))];
-    out.push("", "## " + h.story, "", ...headed(0, req(v.story_goal)), ...refs);
+    out.push("", "## " + h.story, "", ...headed(0, req(v.story_goal)));
+    if (refs.length) out.push("", "### " + h.storyRefs, "", ...refs.flatMap(r => headed(0, r)));
     /* スコープはストーリーと同じ階層の節。スコープ外がないなら「なし」と明示する */
     const inn = listItems(v.scope_in), outs = listItems(v.scope_out);
     out.push("", "## " + h.scope, "### " + h.scopeIn, "");

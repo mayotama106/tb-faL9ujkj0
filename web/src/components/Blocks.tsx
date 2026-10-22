@@ -173,6 +173,7 @@ function CaseView({ f, path }: { f: FieldDef; path: Path }) {
       <div className="chips" role="group" aria-label={f.label}>
         <button type="button" className="chip" aria-pressed={cv.mode === "error"} onClick={() => set("error")}>エラーハンドリング</button>
         <button type="button" className="chip" aria-pressed={cv.mode === "text"} onClick={() => set("text")}>処理を書く</button>
+        <button type="button" className="chip" aria-pressed={cv.mode === "na"} onClick={() => set("na")}>該当しない</button>
       </div>
       {cv.mode === "error" && <Kids><ErrorEditor path={[...path, "err"]} /></Kids>}
       {cv.mode === "text" && <Kids><Field path={[...path, "text"]} label="どうする？" ph="例: 空の一覧を返す" /></Kids>}

@@ -45,7 +45,8 @@ export interface CompDef {
 }
 
 export interface ErrVal { display?: string; status?: string; code?: string; message?: string; note?: string }
-export interface CaseVal { mode?: "" | "text" | "error"; text?: string; err?: ErrVal }
+/* mode: text は文で書く、error はエラーハンドリング、na は該当しない(本文にも受け入れ条件にも出さない) */
+export interface CaseVal { mode?: "" | "text" | "error" | "na"; text?: string; err?: ErrVal }
 
 export const DISPLAYS = ["全画面", "モーダル", "その他", "表示しない"];
 export const NO_DISPLAY = "表示しない";
@@ -68,21 +69,19 @@ const blocks = (id: string, q: string, label: string, extra?: Partial<FieldDef>)
 export const COMPONENTS: Record<string, CompDef> = {
   api: {
     type: "api", name: "API作成", container: true, suffix: "API", group: "入れ物",
-    ac: ["{名前}APIを呼び出すと、正常時のレスポンスが返ること"],
+    /* 正常時の受け入れ条件は「正常に処理が完了した場合」にまとめるので、API自体の受け入れ条件は作らない */
     hint: "リクエストの形式・必須のチェックは、処理の流れに「チェック」を足して書く。",
     fields: [
       head("APIの名前は？", "例: ファイルアップロード", "API名"),
       { id: "method", q: "メソッドは？", label: "メソッド", kind: "choice", options: ["GET", "POST", "PUT", "DELETE"] },
       t("endpoint", "エンドポイントは？", "エンドポイント", { ph: "例: /account/applications/documents/:documentType" }),
-      t("caller", "なにを起因に誰からいつ呼び出される？", "呼び出しの起因・呼び出し元・タイミング"),
+      t("caller", "何をきっかけに、どこから、いつ呼び出される？", "呼び出し元・きっかけ・タイミング"),
       { id: "req", q: "リクエストパラメータは何？", label: "リクエストパラメータ", kind: "group", ref: true, fields: [
         { id: "req_place", q: "パラメータ形式は？", label: "パラメータ形式", kind: "multi", options: ["クエリ", "パス", "ボディ", "ヘッダ"] },
-        ls("req_items", "項目とそれぞれの型は？", "項目と型", "項目名: 型"),
-        ls("req_need", "それぞれの項目は必須か任意か", "必須/任意", "項目名: 必須または任意")
+        ls("req_items", "項目は？(1項目ずつ。項目名、型、必須か任意か)", "項目", "例: postalCode: string（必須）")
       ] },
-      { id: "res", q: "正常な場合のレスポンスは？", label: "レスポンス(正常時)", kind: "group", ref: true, fields: [
-        ls("res_items", "項目とそれぞれの型は？", "項目と型", "項目名: 型"),
-        ls("res_need", "それぞれの項目は必須か任意か", "必須/任意", "項目名: 必須または任意")
+      { id: "res", q: "正常な場合のレスポンスは？", label: "レスポンス（正常時）", kind: "group", ref: true, fields: [
+        ls("res_items", "項目は？(1項目ずつ。項目名、型、必須か任意か)", "項目", "例: updatedAt: string（必須）")
       ] },
       blocks("flow", "API内の処理は？(部品を上から足す)", "処理の流れ")
     ]
@@ -131,14 +130,14 @@ export const COMPONENTS: Record<string, CompDef> = {
     ]
   },
   check: {
-    type: "check", name: "チェック", group: "処理", ac: ["{名前}がされていること"],
+    type: "check", name: "チェック", group: "処理", ac: ["{名前}が行われていること"],
     fields: [
       head("チェック群の名前は？", "例: アップロードファイルの業務チェック"),
-      acField("例: ミドルウェアでバリデーションチェックがされていること / 空なら「〇〇がされていること」"),
+      acField("例: ミドルウェアでバリデーションチェックが行われていること / 空なら「〇〇が行われていること」"),
       { id: "items", q: "チェックは？(1つずつ足す)", label: "チェック", kind: "rows", bare: true, fields: [
         t("name", "チェック名は？", "チェック名", { head: true, ph: "例: ０バイトファイルチェック" }),
         t("detail", "詳細は？(任意)", "詳細", { optional: true, bare: true, ph: "例: 拡張子が「.pdf」かどうか" }),
-        { id: "err", q: "引っかかった場合は？", label: "{行}に引っかかる場合", kind: "error" }
+        { id: "err", q: "エラーになる場合は？", label: "{行}でエラーになる場合", kind: "error" }
       ] }
     ]
   },
@@ -203,7 +202,7 @@ export const COMPONENTS: Record<string, CompDef> = {
     type: "if", name: "条件分岐", group: "処理", hint: "出し分けは、場合ごとに「表示更新」を入れる。", ac: [CAN],
     fields: [
       head("何を確認する？", "例: ステータスを元に編集可否をチェック"),
-      acField("例: ステータスによる編集可否のチェックがされていること"),
+      acField("例: ステータスによる編集可否のチェックが行われていること"),
       { id: "cases", q: "場合ごとの処理は？", label: "場合", kind: "branches" }
     ]
   },

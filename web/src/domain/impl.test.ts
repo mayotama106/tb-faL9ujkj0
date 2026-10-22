@@ -18,7 +18,7 @@ const sample: Values = {
   story_refs: ["機能AのアップロードAPIを参照する（PUT：/account/applications/documents/:documentType）"],
   proc_name: "ファイルアップロード",
   blocks: [
-    { type: "check", name: "アップロードファイルの業務チェック", ac: "ミドルウェアでバリデーションチェックがされていること", items: [
+    { type: "check", name: "アップロードファイルの業務チェック", ac: "ミドルウェアでバリデーションチェックが行われていること", items: [
       chk("0バイトファイルチェック", be("400", "I009-00022")),
       chk("ファイルサイズ超過チェック"),
       chk("ファイル形式チェック", be("400", "I009-00012"), "拡張子が「.pdf」かどうか"),
@@ -29,7 +29,7 @@ const sample: Values = {
       chk("パスパラメータBの13桁チェック", be("400", "E001-00002")),
       chk("ファイル存在チェック", be("400", "I009-00014"))] },
     { type: "get", name: "Xをキーにステータスを取得", target: "申込", cond: "申込ID", zero: { mode: "text", text: "対象なしとして扱う" } },
-    { type: "if", name: "ステータスを元に編集可否をチェック", ac: "ステータスによる編集可否のチェックがされていること", cases: [
+    { type: "if", name: "ステータスを元に編集可否をチェック", ac: "ステータスによる編集可否のチェックが行われていること", cases: [
       { cond: "編集可能な", none: true, blocks: [] },
       { cond: "編集不可の", blocks: [{ type: "error", err: be() }] }] }
   ],
@@ -45,7 +45,10 @@ const expected = `## 対象のフィーチャー
 ## ストーリー
 
 * 口座開設審査に必要な書類をオンラインでアップロードできる機能を提供したい
-   * 機能AのアップロードAPIを参照する（PUT：/account/applications/documents/:documentType）
+
+### 参照
+
+* 機能AのアップロードAPIを参照する（PUT：/account/applications/documents/:documentType）
 
 ## スコープ
 ### スコープ内
@@ -80,35 +83,35 @@ const expected = `## 対象のフィーチャー
 
 ## 受け入れ条件
 
-* ミドルウェアでバリデーションチェックがされていること
-   * 0バイトファイルチェックに引っかかる場合
+* ミドルウェアでバリデーションチェックが行われていること
+   * 0バイトファイルチェックでエラーになる場合
       * HTTPステータス：400
       * エラーコード：I009-00022
-   * ファイルサイズ超過チェックに引っかかる場合
+   * ファイルサイズ超過チェックでエラーになる場合
       * HTTPステータス：【未記入】
       * エラーコード：【未記入】
-   * ファイル形式チェックに引っかかる場合
+   * ファイル形式チェックでエラーになる場合
       * HTTPステータス：400
       * エラーコード：I009-00012
-   * ファイル名の存在チェックに引っかかる場合
+   * ファイル名の存在チェックでエラーになる場合
       * HTTPステータス：400
       * エラーコード：E001-00002
-   * ファイルデータの存在チェックに引っかかる場合
+   * ファイルデータの存在チェックでエラーになる場合
       * HTTPステータス：400
       * エラーコード：E001-00002
-* リクエストバリデーションチェックがされていること
-   * パスパラメータBの存在チェックに引っかかる場合
+* リクエストバリデーションチェックが行われていること
+   * パスパラメータBの存在チェックでエラーになる場合
       * HTTPステータス：400
       * エラーコード：E001-00002
-   * パスパラメータBの13桁チェックに引っかかる場合
+   * パスパラメータBの13桁チェックでエラーになる場合
       * HTTPステータス：400
       * エラーコード：E001-00002
-   * ファイル存在チェックに引っかかる場合
+   * ファイル存在チェックでエラーになる場合
       * HTTPステータス：400
       * エラーコード：I009-00014
 * Xをキーにステータスを取得できること
    * 0件の場合、対象なしとして扱うこと
-* ステータスによる編集可否のチェックがされていること
+* ステータスによる編集可否のチェックが行われていること
    * 編集可能な場合、何もしないこと
    * 編集不可の場合
       * HTTPステータス：【未記入】
@@ -155,22 +158,37 @@ describe("実装チケット", () => {
 
   it("入れ物の部品は節になり、中の部品のエラーハンドリングが受け入れ条件になる", () => {
     const v: Values = { blocks: [{ type: "api", name: "書類アップロード", method: "PUT", endpoint: "/docs/:type", caller: "画面から",
-      req_ref: true, req_link: "IF定義書", res_items: ["id: string"], res_need: ["id: 必須"],
+      req_ref: true, req_link: "IF定義書", res_items: ["id: string（必須）"],
       flow: [
         { type: "auth", name: "ログイン中か確認", how: "トークン", unauth: { display: "表示しない", status: "401", code: "E401", message: "" } },
         { type: "create", name: "書類を登録", target: "書類", items: ["種類", "ファイル"],
           dup: { mode: "text", text: "上書きする" }, fail: { mode: "error", err: { display: "モーダル", status: "500", code: "E500", message: "保存できません" } } }
       ] }] };
     const r = buildTicket(GENRES.impl, v);
-    expect(r.text).toContain(["## 書類アップロードAPI", "### 仕様", "", "* メソッド：PUT", "* エンドポイント：/docs/:type", "* 呼び出しの起因・呼び出し元・タイミング：画面から",
-      "* リクエストパラメータ", "   * 原典：IF定義書", "* レスポンス(正常時)", "   * 項目と型", "      * id: string"].join("\n"));
+    expect(r.text).toContain(["## 書類アップロードAPI", "### 仕様", "", "* メソッド：PUT", "* エンドポイント：/docs/:type", "* 呼び出し元・きっかけ・タイミング：画面から",
+      "* リクエストパラメータ", "   * 原典：IF定義書", "* レスポンス（正常時）", "   * 項目", "      * id: string（必須）"].join("\n"));
     expect(r.text).toContain(["### 処理の流れ", "", "1. ログイン中か確認", "   * 確認の方法：トークン", "2. 書類を登録", "   * 保存先：書類",
       "   * 保存する項目", "      * 種類", "      * ファイル", "   * 同じリクエストが届いた場合：上書きする", "   * 保存に失敗した場合：エラーモーダルを表示"].join("\n"));
-    expect(r.text).toContain(["* 書類アップロードAPIを呼び出すと、正常時のレスポンスが返ること",
-      "* ログイン中か確認できること", "   * 認証できない場合", "      * HTTPステータス：401", "      * エラーコード：E401",
+    expect(r.text).not.toContain("APIを呼び出すと");
+    expect(r.text).toContain(["## 受け入れ条件", "", "* ログイン中か確認できること", "   * 認証できない場合", "      * HTTPステータス：401", "      * エラーコード：E401",
       "* 書類を登録できること", "   * 同じリクエストが届いた場合、上書きすること", "   * 保存に失敗した場合", "      * 表示：モーダル", "      * HTTPステータス：500", "      * エラーコード：E500", "      * エラーメッセージ：保存できません"].join("\n"));
     /* 任意の「権限がない場合」は空なので受け入れ条件に出さない */
     expect(r.text).not.toContain("権限がない場合");
+  });
+
+  it("「処理を書く」の文は「〜こと」で終える。「該当しない」は本文にも受け入れ条件にも出さない", () => {
+    const v: Values = { blocks: [{ type: "update", name: "住所を更新", target: "会員", cond: "会員ID", items: ["住所"],
+      none: { mode: "text", text: "エラーを返却" }, part: { mode: "na" } }] };
+    const r = buildTicket(GENRES.impl, v);
+    expect(r.text).toContain("   * 対象が見つからない場合、エラーを返却すること");
+    expect(r.text).not.toContain("一部の対象で失敗した場合");
+    expect(r.blocks.find(b => b.key === "build")!.missing).toBe(1);   /* 処理の名前だけ */
+  });
+
+  it("APIの「項目と型」と「必須/任意」は、読み込み時に「項目」1つにまとめる", () => {
+    const n = upgradeImpl({ scope_in: [], blocks: [{ type: "api", req_items: ["postalCode: string", "address2: string"], req_need: ["postalCode: 必須", "address2: 任意", "x: 必須"] }] });
+    expect(n.blocks[0].req_items).toEqual(["postalCode: string（必須）", "address2: string（任意）", "x: 必須"]);
+    expect("req_need" in n.blocks[0]).toBe(false);
   });
 
   it("「なし」の欄は出さず、画面の要素の入力不正は行の名前で受け入れ条件になる", () => {
@@ -254,7 +272,7 @@ describe("旧形式からの引き継ぎ", () => {
       { kind: "if", text: "分岐", yes: "可能な", no: "不可の", thenNone: true, then: [], else: [{ kind: "error", status: "403", code: "E2" }] }] };
     const r = buildTicket(GENRES.impl, toImpl("logic", old));
     expect(r.text).toContain(["1. チェック", "   * a", "2. 分岐", "   * 可能な場合、何もしない", "   * 不可の場合、エラーを返却"].join("\n"));
-    expect(r.text).toContain(["* チェックがされていること", "   * aに引っかかる場合", "      * HTTPステータス：400", "      * エラーコード：E1"].join("\n"));
+    expect(r.text).toContain(["* チェックが行われていること", "   * aでエラーになる場合", "      * HTTPステータス：400", "      * エラーコード：E1"].join("\n"));
   });
   it("API作成の観点表を、API作成の部品とデータ操作の部品に移す", () => {
     const n = toImpl("api", { api_name: "振込先登録API", method: "POST", endpoint: "/payees", post_db: "振込先", post_dup_kind: "エラーモーダル",

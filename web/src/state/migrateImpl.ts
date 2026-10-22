@@ -166,8 +166,34 @@ function scopeIn(v: Values): string[] {
 }
 /* 実装チケットの入力を、今の形に合わせる(スコープ内・スコープ外の追加) */
 export function upgradeImpl(v: Values): Values {
-  if (Array.isArray(v.scope_in) || !s(v.story_scope)) return v;
-  const n: Values = { ...v, scope_in: scopeIn(v) };
-  delete n.story_scope;
+  let n = v;
+  if (!Array.isArray(v.scope_in) && s(v.story_scope)) {
+    n = { ...v, scope_in: scopeIn(v) };
+    delete n.story_scope;
+  }
+  /* APIの「項目と型」「必須/任意」の2つの一覧を、「項目」1つにまとめる(postalCode: string（必須）) */
+  if (Array.isArray(n.blocks) && n.blocks.some((b: Values) => b && (b.req_need || b.res_need))) {
+    n = { ...n, blocks: n.blocks.map((b: Values) => (b && (b.req_need || b.res_need) ? mergeNeeds(b) : b)) };
+  }
+  return n;
+}
+function mergeNeeds(b: Values): Values {
+  const n: Values = { ...b };
+  (["req", "res"] as const).forEach(k => {
+    const items: string[] = (Array.isArray(n[k + "_items"]) ? n[k + "_items"] : []).map(String);
+    const need: string[] = (Array.isArray(n[k + "_need"]) ? n[k + "_need"] : []).map(String).filter((x: string) => x.trim());
+    const nameOf = (x: string) => x.split(/[:：]/)[0].trim();
+    const used = new Set<number>();
+    const merged = items.map(it => {
+      const j = need.findIndex((x, i) => !used.has(i) && nameOf(x) === nameOf(it));
+      if (j < 0) return it;
+      used.add(j);
+      const val = need[j].split(/[:：]/).slice(1).join(":").trim();
+      return val ? it + "（" + val + "）" : it;
+    });
+    need.forEach((x: string, i: number) => { if (!used.has(i)) merged.push(x); });
+    if (merged.length) n[k + "_items"] = merged;
+    delete n[k + "_need"];
+  });
   return n;
 }
