@@ -120,7 +120,7 @@ export const COMPONENTS: Record<string, CompDef> = {
       { id: "columns", q: "カラムは？(1つずつ足す)", label: "カラム", kind: "rows", fields: [
         t("name", "カラム名は？", "カラム名", { head: true }),
         t("type", "型と桁は？", "型・桁"),
-        { id: "need", q: "必須か任意か", label: "必須/任意", kind: "choice", options: ["必須", "任意"] },
+        { id: "need", q: "必須か任意か？", label: "必須/任意", kind: "choice", options: ["必須", "任意"] },
         t("def", "初期値は？(任意)", "初期値", { optional: true }),
         t("note", "説明は？(任意)", "説明", { optional: true })
       ] },
@@ -180,7 +180,7 @@ export const COMPONENTS: Record<string, CompDef> = {
       head("何を削除する？", "例: 取り下げた書類を削除"),
       t("target", "どのDB(テーブル)から？", "削除元"),
       t("cond", "削除対象の条件は？", "条件"),
-      { id: "how", q: "論理削除か物理削除か", label: "削除方式", kind: "choice", options: ["論理削除", "物理削除"] },
+      { id: "how", q: "論理削除か物理削除か？", label: "削除方式", kind: "choice", options: ["論理削除", "物理削除"] },
       t("rel", "紐づくデータはどうする？", "紐づくデータの扱い"),
       cs("none", "対象が見つからない場合は？", "対象が見つからない場合"),
       cs("cant", "削除できない場合は？", "削除できない場合"),

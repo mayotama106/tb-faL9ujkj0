@@ -33,7 +33,7 @@ function Palette({ top, groups, onAdd }: { top: boolean; groups: string[]; onAdd
     <div className="palette">
       {groups.filter(g => top || g !== "入れ物").map(g => (
         <div key={g} className="pal-row">
-          <span className="pal-g">{g}</span>
+          <span className="pal-g">{g === "入れ物" ? "大枠" : g}</span>
           {Object.values(defs).filter(d => d.group === g).map(d => (
             <button key={d.type} type="button" className={"etc-btn pal-" + groupClass(d.group)} onClick={() => onAdd(d)}>＋ {d.name}</button>
           ))}
@@ -101,7 +101,7 @@ function BlockView({ path, index, handle, numbered }: { path: Path; index: numbe
         <span className="spacer" />
         <Del label={def.name + " " + (index + 1) + " を削除"} onClick={() => {
           editDoc(v => { arrayAt(v, path).splice(index, 1); });
-          toast(def.name + "を削除した", true);
+          toast(def.name + "を削除しました", true);
         }} />
       </div>
       {!closed && <Kids>
@@ -277,7 +277,7 @@ function RowsView({ f, path }: { f: FieldDef; path: Path }) {
                 <span className="spacer" />
                 <Del label={name + " " + (i + 1) + " を削除"} onClick={() => {
                   editDoc(v => { arrayAt(v, p).splice(i, 1); });
-                  toast(name + "を削除した", true);
+                  toast(name + "を削除しました", true);
                 }} />
               </div>
               {rows[i] && <FieldsView fields={f.fields || []} path={[...p, i]} obj={rows[i]} />}
@@ -306,7 +306,7 @@ function BranchesView({ f, path }: { f: FieldDef; path: Path }) {
               ph={i === 0 ? "例: 編集可能な" : "例: 編集不可の"} /></div>
             {cases.length > 1 && <Del label={"場合 " + (i + 1) + " を削除"} onClick={() => {
               editDoc(v => { arrayAt(v, path).splice(i, 1); });
-              toast("場合を削除した", true);
+              toast("場合を削除しました", true);
             }} />}
           </div>
           <div className="chips"><button type="button" className="chip" aria-pressed={!!c.none}

@@ -48,10 +48,10 @@ export function App() {
     <header className="top">
       <button type="button" className="menu" aria-expanded={sidebar} onClick={() => setUI({ sidebar: !sidebar })}>☰<span className="lbl"> 一覧</span></button>
       <span className="brand">TICKET BUILDER</span>
-      {/* チケット(ビルダー)とフィーチャー(分解)の切り替え */}
+      {/* チケット(本文を作る)と切り分け(フィーチャーをチケットに分ける)の切り替え */}
       <div className="views" role="group" aria-label="画面の切り替え">
         <button type="button" className={view === "tickets" ? "hbtn on" : "hbtn"} aria-pressed={view === "tickets"} onClick={() => setUI({ view: "tickets" })}>チケット</button>
-        <button type="button" className={view === "features" ? "hbtn on" : "hbtn"} aria-pressed={view === "features"} onClick={() => setUI({ view: "features", editing: false })}>フィーチャー</button>
+        <button type="button" className={view === "features" ? "hbtn on" : "hbtn"} aria-pressed={view === "features"} onClick={() => setUI({ view: "features", editing: false })}>切り分け</button>
       </div>
       <span className="spacer" />
       <button type="button" className="hbtn" disabled={!canUndo} onClick={undo} title="元に戻す(Ctrl+Z)" aria-label="元に戻す">↶<span className="lbl"> 元に戻す</span></button>
@@ -90,7 +90,7 @@ function Welcome() {
   return (
     <section className="card welcome">
       <h2>チケットを作る</h2>
-      <p className="hint">ジャンルを選ぶと、新しいチケットができる。入力はパートごとに1つずつ埋めていき、ブラウザ内に自動保存される。</p>
+      <p className="hint">ジャンルを選ぶと、新しいチケットができます。入力はパートごとに1つずつ埋めていき、ブラウザ内に自動で保存されます。</p>
       <div className="picker big">
         {Object.keys(GENRES).map(k => <button key={k} type="button" className="plain" onClick={() => createDoc(k)}>{GENRES[k].name}</button>)}
       </div>

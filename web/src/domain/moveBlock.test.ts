@@ -45,7 +45,7 @@ describe("部品の移動", () => {
   it("自分の中へは移せない。入れ物は直下にだけ置ける。同じ場所は何もしない", () => {
     const v = tree();
     expect(checkMove(v, { path: top, index: 1 }, { path: ["blocks", 1, "cases", 0, "blocks"], index: 0 }, top, COMPONENTS)).toMatch("自身の中");
-    expect(checkMove(v, { path: top, index: 3 }, { path: ["blocks", 1, "cases", 1, "blocks"], index: 0 }, top, COMPONENTS)).toMatch("直下にだけ");
+    expect(checkMove(v, { path: top, index: 3 }, { path: ["blocks", 1, "cases", 1, "blocks"], index: 0 }, top, COMPONENTS)).toMatch("いちばん外にだけ");
     expect(checkMove(v, { path: top, index: 1 }, { path: top, index: 2 }, top, COMPONENTS)).toBe("");
     /* 最後の部品を、同じ並びの末尾へ */
     expect(checkMove(v, { path: top, index: 3 }, { path: top, index: Number.MAX_SAFE_INTEGER }, top, COMPONENTS)).toBe("");

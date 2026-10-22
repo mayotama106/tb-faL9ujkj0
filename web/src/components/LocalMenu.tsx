@@ -52,11 +52,11 @@ export function LocalMenu() {
         <div className="local-pop" role="menu">
           {!isLocal && <>
             <a className="primary small" role="menuitem" href="./ticket-builder.html" download="ticket-builder.html" onClick={() => setOpen(false)}>アプリをダウンロード</a>
-            <p className="hint">1つのHTMLファイル。ダブルクリックでブラウザで開ける(ネット接続なしで動く)。</p>
+            <p className="hint">1つのHTMLファイルです。ダブルクリックでブラウザで開けます（ネット接続なしで動きます）。</p>
           </>}
           <button type="button" className="plain" role="menuitem" onClick={exportAll}>データを書き出す(.json)</button>
           <button type="button" className="plain" role="menuitem" onClick={() => file.current?.click()}>データを読み込む</button>
-          <p className="hint">{isLocal ? "公開版とこのファイルは保存先が別。公開版で書き出したデータを読み込むと、続きから使える。" : "公開版とローカル版は保存先が別。ここで書き出して、ローカル版で読み込むと、続きから使える。"}</p>
+          <p className="hint">{isLocal ? "公開版とこのファイルは保存先が別です。公開版で書き出したデータを読み込むと、続きから使えます。" : "公開版とローカル版は保存先が別です。ここで書き出して、ローカル版で読み込むと、続きから使えます。"}</p>
           <input ref={file} type="file" accept=".json,application/json" hidden onChange={e => onFile(e.target.files?.[0])} />
         </div>
       )}

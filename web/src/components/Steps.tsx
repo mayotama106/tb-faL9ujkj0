@@ -16,7 +16,7 @@ function arrayAt(v: Values, path: Path): Values[] {
 }
 function removeAt(path: Path, i: number, what: string) {
   editDoc(v => { arrayAt(v, path).splice(i, 1); });
-  toast(what + "を削除した", true);
+  toast(what + "を削除しました", true);
 }
 function moveAt(path: Path) {
   return (from: number, to: number) => editDoc(v => move(arrayAt(v, path), from, to));
@@ -48,7 +48,7 @@ export function ListControl({ node }: { node: QNode }) {
               onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) { e.preventDefault(); add(); } }} />
             <Del label={node.label + " " + (i + 1) + " を削除"} onClick={() => {
               edit(a => { a.splice(i, 1); });
-              if (items[i].trim()) toast("項目を削除した", true);
+              if (items[i].trim()) toast("項目を削除しました", true);
             }} />
           </div>
         )}

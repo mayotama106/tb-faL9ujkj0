@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ENTRY_KINDS, EXCEL_HEADER, FRONT, ITEM_KINDS, LAYERS, STATUSES, layerName, layersOf, buildFeature, contentOf, defaultTitle, docValues,
-  entryLabel, excelRows, issuesOf, newEntry, newEvent, newItem, statusCount, ticketsOf,
-  type EntryKind, type FEntry, type FEvent, type FItem, type Feature, type FTicket, type Layer, type Status
+  cellsOf, entryLabel, excelRows, issuesOf, newEntry, newEvent, newItem, newStCell, statusCount, stTitle, stValues, ticketsOf,
+  type EntryKind, type FCell, type FEntry, type FEvent, type FItem, type Feature, type FTicket, type Layer, type Status
 } from "../domain/feature";
 import { MISSING } from "../domain/genres";
 import { buildTicket } from "../domain/ticket";
 import { buildXlsx, downloadXlsx } from "../domain/xlsx";
+import { initialValues } from "../state/actions";
 import { ensureKeys } from "../state/persist";
 import { defsOf, genreOf, getAt, getState, newId, setAt, setUI, toast, update, useStore, type Doc } from "../state/store";
 import { stamp } from "../utils";
@@ -40,11 +41,11 @@ function arrayAt(f: Feature, path: Path): unknown[] {
 }
 function removeAt(path: Path, i: number, what: string) {
   editFeature(f => { arrayAt(f, path).splice(i, 1); });
-  toast(what + "を削除した", true);
+  toast(what + "を削除しました", true);
 }
 export function createFeature() {
   const now = Date.now();
-  const f: Feature = { id: newId(), name: "", goal: "", entries: [], createdAt: now, updatedAt: now };
+  const f: Feature = { id: newId(), name: "", goal: "", entries: [], st: newStCell(), createdAt: now, updatedAt: now };
   update(d => { d.features.unshift(f); });
   setUI({ featureId: f.id, view: "features", sidebar: false });
   focusLater(fid(["name"]));
@@ -67,7 +68,20 @@ function createDoc(tk: FTicket) {
     const ff = d.features.find(x => x.id === f.id);
     if (ff) setAt(ff, [...tk.path, "docId"], doc.id);
   });
-  toast("チケットビルダーにチケットを作った");
+  toast("チケット本文を作成しました");
+}
+/* フィーチャー全体のSTチケットを作る(よく使う手順と、画面・処理の一覧を入れておく) */
+function createStDoc(f: Feature) {
+  const v = { ...initialValues("st"), ...stValues(f) };
+  ensureKeys(v);
+  const now = Date.now();
+  const doc: Doc = { id: newId(), genre: "st", v, createdAt: now, updatedAt: now };
+  update(d => {
+    d.docs.unshift(doc);
+    const ff = d.features.find(x => x.id === f.id);
+    if (ff) ff.st = { ...(ff.st || newStCell()), docId: doc.id };
+  });
+  toast("チケット本文を作成しました");
 }
 function openDoc(id: string) {
   setUI({ view: "tickets", currentId: id, editing: false });
@@ -101,8 +115,8 @@ export function FeatureSidebar() {
   const features = useStore(s => s.data.features);
   const currentId = useStore(s => s.ui.featureId);
   const rows = useMemo(() => features.map(f => {
-    const tks = ticketsOf(f);
-    return { f, n: tks.length, done: statusCount(tks)["完了"], issues: issuesOf(f).length };
+    const cells = cellsOf(f);
+    return { f, n: cells.length, done: statusCount(cells)["完了"], issues: issuesOf(f).length };
   }).sort((a, b) => b.f.updatedAt - a.f.updatedAt), [features]);
   return (
     <div className="side">
@@ -126,12 +140,12 @@ export function FeatureSidebar() {
               <button type="button" className="icon" title="削除" aria-label="削除" onClick={() => {
                 update(d => { d.features = d.features.filter(x => x.id !== f.id); });
                 if (currentId === f.id) setUI({ featureId: features.find(x => x.id !== f.id)?.id || null });
-                toast("削除した(ビルダーで作ったチケットは残る)", true);
+                toast("削除しました（作成済みのチケット本文は残ります）", true);
               }}>×</button>
             </div>
           </li>
         ))}
-        {!rows.length && <li className="empty">まだない。「＋ 新しく作る」から始める。</li>}
+        {!rows.length && <li className="empty">まだありません。「＋ 新しく作る」から始めます。</li>}
       </ul>
     </div>
   );
@@ -193,7 +207,7 @@ function PartsEditor({ f }: { f: Feature }) {
     </SortableList>
     <div className="palette">
       <div className="pal-row">
-        <span className="pal-g">起点</span>
+        <span className="pal-g">画面・処理</span>
         {(Object.keys(ENTRY_KINDS) as EntryKind[]).map(k => (
           <button key={k} type="button" className={"etc-btn " + (k === "screen" ? "pal-box" : "pal-proc")} onClick={() => add(k)}>＋ {ENTRY_KINDS[k].name}</button>
         ))}
@@ -213,7 +227,7 @@ function EntryView({ e, i, handle }: { e: FEntry; i: number; handle: ReactNode }
         <span className="spacer" />
         <Del label={k.name + "を削除"} onClick={() => removeAt(["entries"], i, k.name)} />
       </div>
-      {e.kind !== "screen" && <p className="hint">画面を介さない処理。チケットは最初 BE とエラーハンドリングだけ(切り分けで変えられる)。</p>}
+      {e.kind !== "screen" && <p className="hint">画面を介さない処理です。チケットは BE とエラーハンドリングになります。</p>}
       <FText path={[...base, "name"]} label={k.name + "の名前は？"} ph={k.ph} />
       <Kids>
         <SortableList ids={e.events.map(ev => ev._k)} onMove={(a, b) => editFeature(ff => move(ff.entries[i].events, a, b))}>
@@ -300,8 +314,8 @@ function ItemView({ it, split, screen, path, n, handle, onDelete }: { it: FItem;
 
 /* 切り分けと実施状況: イベントごとに、開発領域のチケットのマス(オン・オフ、タイトル、実施状況) */
 function SplitEditor({ f }: { f: Feature }) {
-  const tks = ticketsOf(f);
-  const c = statusCount(tks);
+  const cells = cellsOf(f);
+  const c = statusCount(cells);
   const issues = issuesOf(f).filter(x => x.part === "split");
   const data = useStore(s => s.data);
   const docMissing = (id: string) => {
@@ -309,9 +323,9 @@ function SplitEditor({ f }: { f: Feature }) {
     return d ? buildTicket(genreOf(data, d.genre), d.v, defsOf(data)).missing : null;
   };
   return <>
-    <p className="hint">イベントごとに、開発領域(CLIENT・BFF / BE / エラーハンドリング)のチケットが自動でそろう。CLIENT と BFF を別のチケットにするときは「CLIENTとBFFを分ける」。不要なもの(BE が要らないなど)は × で削除する。1マスが1チケット。</p>
+    <p className="hint">イベントごとに、開発領域（CLIENT・BFF / BE / エラーハンドリング）のチケットが自動でそろいます。カード1枚が1チケットです。CLIENT と BFF を別のチケットにするときは「CLIENTとBFFを分ける」を、不要なもの（BE が要らないなど）は × を押します。</p>
     <div className="status-sum">
-      <span>チケット {tks.length} 件</span>
+      <span>チケット{cells.length}件</span>
       {STATUSES.map(s => <span key={s} className={"st-pill st-" + STATUSES.indexOf(s)}>{s} {c[s]}</span>)}
       <span className="spacer" />
       <button type="button" className="primary small" onClick={() => exportExcel([f], f.name.trim() || "チケット一覧")}>Excelに書き出す</button>
@@ -331,7 +345,7 @@ function SplitEditor({ f }: { f: Feature }) {
                   onClick={() => setF(["entries", i, "events", j, "cells", l, "on"], true, false)}>＋ {layerName(ev, l)}</button>
               ))}
             </div>
-            {!layersOf(ev).some(l => ev.cells[l]?.on) && <p className="hint">チケットなし(上の「＋」で戻せる)</p>}
+            {!layersOf(ev).some(l => ev.cells[l]?.on) && <p className="hint">チケットはありません（上の「＋」で戻せます）。</p>}
             <div className="cells">
               {layersOf(ev).filter(l => ev.cells[l]?.on).map(l => <Cell key={l} f={f} e={e} ev={ev} l={l} path={["entries", i, "events", j, "cells", l]} docMissing={docMissing} />)}
             </div>
@@ -339,7 +353,17 @@ function SplitEditor({ f }: { f: Feature }) {
         ))}
       </div>
     ))}
-    {!f.entries.length && <p className="hint">「洗い出し」で画面などを足すと、ここにチケットが並ぶ。</p>}
+    {!f.entries.length && <p className="hint">「洗い出し」で画面などを足すと、ここにチケットが並びます。</p>}
+    <div className="split-entry">
+      <div className="q">フィーチャー全体</div>
+      <div className="split-event">
+        <div className="split-ev-name">
+          <span>ST（フィーチャー全体を通して確かめる）</span>
+          {!(f.st && f.st.on) && <button type="button" className="etc-btn small-btn" title="削除したチケットを戻す" onClick={() => setF(["st"], { ...(f.st || newStCell()), on: true }, false)}>＋ ST</button>}
+        </div>
+        {f.st && f.st.on && <div className="cells"><StCell f={f} cell={f.st} docMissing={docMissing} /></div>}
+      </div>
+    </div>
     {issues.length > 0 && <div className="guide"><div className="q">確認事項</div><ul>{issues.map((x, i) => <li key={i}>{x.text}</li>)}</ul></div>}
   </>;
 }
@@ -353,6 +377,27 @@ function toggleSplit(path: Path) {
   });
 }
 
+/* フィーチャー全体のSTチケットのカード */
+function StCell({ f, cell, docMissing }: { f: Feature; cell: FCell; docMissing: (id: string) => number | null }) {
+  const m = cell.docId ? docMissing(cell.docId) : null;
+  return (
+    <div className={"cell st-b" + STATUSES.indexOf(cell.status || "未着手")}>
+      <div className="cell-head">
+        <span className="lname">ST</span>
+        <span className="spacer" />
+        <Del label="STのチケットを削除" onClick={() => { setF(["st", "on"], false, false); toast("STのチケットを削除しました", true); }} />
+      </div>
+      <AutoText id={fid(["st", "title"])} value={cell.title || ""} placeholder={stTitle(f)} label="STのチケットタイトル" onChange={s => setF(["st", "title"], s)} />
+      <select value={cell.status || "未着手"} aria-label="STの実施状況" onChange={x => setF(["st", "status"], x.target.value as Status, false)}>
+        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+      {cell.docId && m != null
+        ? <button type="button" className="link small" onClick={() => openDoc(cell.docId!)}>チケット本文を開く（{m ? "未記入" + m + "件" : "記入済み"}）</button>
+        : <button type="button" className="link small" onClick={() => createStDoc(f)}>チケット本文を作る</button>}
+    </div>
+  );
+}
+
 function Cell({ f, e, ev, l, path, docMissing }: { f: Feature; e: FEntry; ev: FEvent; l: Layer; path: Path; docMissing: (id: string) => number | null }) {
   const cell = ev.cells[l] || { on: false };
   const tk = ticketsOf(f).find(x => x.event._k === ev._k && x.layer === l);
@@ -364,17 +409,17 @@ function Cell({ f, e, ev, l, path, docMissing }: { f: Feature; e: FEntry; ev: FE
       <div className="cell-head">
         <span className="lname">{layerName(ev, l)}</span>
         <span className="spacer" />
-        <Del label={layerName(ev, l) + "のチケットを削除"} onClick={() => { setF([...path, "on"], false, false); toast(layerName(ev, l) + "のチケットを削除した", true); }} />
+        <Del label={layerName(ev, l) + "のチケットを削除"} onClick={() => { setF([...path, "on"], false, false); toast(layerName(ev, l) + "のチケットを削除しました", true); }} />
       </div>
       <AutoText id={fid([...path, "title"])} value={cell.title || ""} placeholder={defaultTitle(e, ev, l)} label={layerName(ev, l) + "のチケットタイトル"}
         onChange={s => setF([...path, "title"], s)} />
       <select value={cell.status || "未着手"} aria-label={layerName(ev, l) + "の実施状況"} onChange={x => setF([...path, "status"], x.target.value as Status, false)}>
         {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
-      {content.length > 0 ? <ul className="cell-items">{content.map((x, i) => <li key={i}>{x}</li>)}</ul> : <span className="meta">中身(チェック・ロジック)なし</span>}
+      {content.length > 0 ? <ul className="cell-items">{content.map((x, i) => <li key={i}>{x}</li>)}</ul> : <span className="meta">中身（チェック・ロジック）はありません</span>}
       {cell.docId && m != null
-        ? <button type="button" className="link small" onClick={() => openDoc(cell.docId!)}>ビルダーで開く({m ? "未記入 " + m : "記入済み"})</button>
-        : <button type="button" className="link small" onClick={() => createDoc(tk)}>ビルダーでチケットを作る</button>}
+        ? <button type="button" className="link small" onClick={() => openDoc(cell.docId!)}>チケット本文を開く（{m ? "未記入" + m + "件" : "記入済み"}）</button>
+        : <button type="button" className="link small" onClick={() => createDoc(tk)}>チケット本文を作る</button>}
     </div>
   );
 }
@@ -420,7 +465,7 @@ export function FeatureWelcome() {
   return (
     <section className="card welcome">
       <h2>チケットを切り分ける</h2>
-      <p className="hint">フィーチャーを実装するのに必要なチケットを、漏れなくダブりなく切り分ける。画面を足すとイベントが入り、イベントごとに CLIENT・BFF / BE / エラーハンドリングのチケットが自動でそろう。実施状況を付けて、Excelに書き出して共有できる。</p>
+      <p className="hint">フィーチャーを実装するのに必要なチケットを、漏れなくダブりなく切り分けます。画面を足すとイベントが入り、イベントごとに CLIENT・BFF / BE / エラーハンドリングのチケットが自動でそろいます。実施状況を付けて、Excelに書き出して共有できます。</p>
       <button type="button" className="primary" onClick={createFeature}>＋ 切り分けを始める</button>
     </section>
   );

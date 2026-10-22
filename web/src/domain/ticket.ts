@@ -303,7 +303,10 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
 
   /* 節の構成を自前で持つジャンル(バグチケット) */
   if (g.sections) {
-    block("basic", () => [H(2, g.storyLabel || "ストーリー"), "", ...free("story")]);
+    /* 対象のフィーチャーは任意。書いてあれば先頭に出す */
+    block("basic", () => [
+      ...(str("feat_name") ? [H(2, h.feature), "", "* フィーチャー：" + str("feat_name"), ...(str("feat_part") ? ["* 対象：" + str("feat_part")] : []), ""] : []),
+      H(2, g.storyLabel || "ストーリー"), "", ...free("story")]);
     titleBlock();
     g.sections.forEach(sec => block("sec:" + sec.key, () => {
       const o = ["", H(2, sec.title), ""];

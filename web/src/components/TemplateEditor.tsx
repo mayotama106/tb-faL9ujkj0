@@ -102,10 +102,10 @@ function GenreEditor({ genre }: { genre: string }) {
     <>
       <section className="card">
         <h2>{g.name}のテンプレート{edited && <span className="tag">編集済み</span>}</h2>
-        <p className="hint">ここでの変更は、このブラウザ内にだけ保存され、すぐに全チケットへ反映される。入力済みの内容は消えない。問いは ⋮⋮ を持って並べ替えられる。</p>
+        <p className="hint">ここでの変更は、このブラウザ内にだけ保存され、すぐに全チケットへ反映されます。入力済みの内容は消えません。問いは ⋮⋮ を持って並べ替えられます。</p>
         <button type="button" className="plain" disabled={!edited} onClick={() => {
           update(d => { delete d.templates[genre]; });
-          toast(g.name + "のテンプレートを初期状態に戻した", true);
+          toast(g.name + "のテンプレートを初期状態に戻しました", true);
         }}>このジャンルを初期状態に戻す</button>
       </section>
       <section className="card">
@@ -113,13 +113,13 @@ function GenreEditor({ genre }: { genre: string }) {
         {g.st ? <>
           {([["overview", "実施概要"], ["content", "内容"], ["schedule", "スケジュール"], ["env", "実施環境"], ["steps", "実施手順"], ["ac", "受け入れ条件"]] as const)
             .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
-          <p className="hint">実施手順の部品と、部品ごとの受け入れ条件の文言は、上の「部品」から選んで編集する。</p>
+          <p className="hint">実施手順の部品と、部品ごとの受け入れ条件の文言は、上の「部品」から選んで編集します。</p>
         </> : g.impl ? <>
           {([["feature", "対象のフィーチャー"], ["story", "ストーリー"], ["storyRefs", "ストーリーの参照"], ["scope", "スコープ"], ["scopeIn", "スコープ内"], ["scopeOut", "スコープ外"], ["flowSuffix", "処理の見出しの末尾(〇〇処理)"], ["flowTitle", "処理の流れ"], ["ac", "受け入れ条件"],
             ["okCase", "受け入れ条件の正常時の書き方"], ["notes", "制約事項・技術的補足"], ["branch", "ブランチ"],
             ["call", "呼び出し条件"], ["nonfunc", "非機能要件"], ["impact", "既存影響"]] as const)
             .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
-          <p className="hint">実装チケットの問いは、部品ごとに編集する(上の「部品」から選ぶ)。</p>
+          <p className="hint">実装チケットの問いは、部品ごとに編集します（上の「部品」から選びます）。</p>
         </> : g.sections ? <>
           <EdField label="見出し: 概要" value={g.storyLabel || ""} onChange={val => editTpl(genre, t => { t.storyLabel = val; }, "storyLabel")} />
           {g.sections.map((sec, i) => <div key={sec.key}>
@@ -133,7 +133,7 @@ function GenreEditor({ genre }: { genre: string }) {
             .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
           <EdField label="受け入れ条件の1行目(新規作成)" value={h.leadNew} onChange={setHead("leadNew")} />
           <EdField label="受け入れ条件の1行目(既存改修)" value={h.leadMod} onChange={setHead("leadMod")} />
-          <p className="hint">{"{名前}"} は、名前欄の値と「{g.noun}」に置き換わる。</p>
+          <p className="hint">{"{名前}"} は、名前欄の値と「{g.noun}」に置き換わります。</p>
         </>}
         {(g.st ? [] as const : g.impl ? [["deps", "依存関係"]] as const : [["deps", "依存関係・環境"], ["refs", "参考情報"]] as const)
           .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
@@ -189,7 +189,7 @@ function EdNode({ genre, path, index, handle }: { genre: string; path: Path; ind
           editTpl(genre, d => nodeArrays(d).forEach(arr => {
             for (let i = arr.length - 1; i >= 0; i--) if (arr[i].id === n.id) arr.splice(i, 1);
           }));
-          toast("問い「" + n.q + "」を削除した", true);
+          toast("問い「" + n.q + "」を削除しました", true);
         }}>×</button>
       </div>
       <EdField label="問い" value={n.q} onChange={val => sync(x => { x.q = val; }, "q")} />
@@ -244,7 +244,7 @@ function CompEditor({ type }: { type: string }) {
   return <>
     <section className="card">
       <h2>部品: {def.name}{edited && <span className="tag">編集済み</span>}</h2>
-      <p className="hint">ここでの変更は、このブラウザ内にだけ保存され、すぐに全チケットへ反映される。入力済みの内容は消えない(消した欄の値は本文に出なくなる)。欄は ⋮⋮ を持って並べ替えられる。</p>
+      <p className="hint">ここでの変更は、このブラウザ内にだけ保存され、すぐに全チケットへ反映されます。入力済みの内容は消えません（消した欄の値は本文に出なくなります）。欄は ⋮⋮ を持って並べ替えられます。</p>
       <EdField label="部品の名前(追加ボタンの表記)" value={def.name} onChange={val => editComp(type, d => { d.name = val; }, "name")} />
       {def.container && <EdField label="本文の節の見出しの末尾(〇〇API など)" value={def.suffix || ""}
         onChange={val => editComp(type, d => { d.suffix = val; }, "suffix")} />}
@@ -255,7 +255,7 @@ function CompEditor({ type }: { type: string }) {
         onChange={lines => editComp(type, d => { d.ac = lines; }, "ac")} />}
       <button type="button" className="plain" disabled={!edited} onClick={() => {
         update(d => { delete d.comps[type]; });
-        toast("部品「" + COMPONENTS[type].name + "」を初期状態に戻した", true);
+        toast("部品「" + COMPONENTS[type].name + "」を初期状態に戻しました", true);
       }}>この部品を初期状態に戻す</button>
     </section>
     <section className="card">
@@ -298,7 +298,7 @@ function FieldDefView({ type, path, index, handle }: { type: string; path: Path;
         <span className="spacer" />
         {!f.head && <button type="button" className="del" aria-label="この欄を削除" title="削除" onClick={() => {
           editComp(type, d => { getAt(d, path).splice(index, 1); });
-          toast("欄「" + f.q + "」を削除した", true);
+          toast("欄「" + f.q + "」を削除しました", true);
         }}>×</button>}
       </div>
       <EdField label="問い" value={f.q} onChange={val => set(x => { x.q = val; }, "q")} />

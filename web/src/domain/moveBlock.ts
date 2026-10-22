@@ -18,8 +18,8 @@ export function checkMove(v: Values, from: Spot, to: Spot, top: Path, defs: Reco
   const src = at(v, from.path), dst = at(v, to.path);
   const b = Array.isArray(src) ? src[from.index] : undefined;
   if (!b || (dst != null && !Array.isArray(dst))) return "";
-  if (isInside(from, to.path)) return "部品を、その部品自身の中へは移せない";
-  if (defs[b.type]?.container && !same(to.path, top)) return defs[b.type].name + "(入れ物)は、チケットの直下にだけ置ける";
+  if (isInside(from, to.path)) return "部品を、その部品自身の中へは移せません";
+  if (defs[b.type]?.container && !same(to.path, top)) return defs[b.type].name + "（大枠）は、いちばん外にだけ置けます";
   const i = Math.min(to.index, Array.isArray(dst) ? dst.length : 0);
   if (same(from.path, to.path) && (i === from.index || i === from.index + 1)) return "";
   return null;

@@ -36,7 +36,7 @@ export function Preview({ g, v, ticket, partKey, onGo }: {
         <CopyButton className="plain" text={() => titleOf(v)} done="タイトルをコピーした">タイトルをコピー</CopyButton>
         <button type="button" className="plain" onClick={() => downloadMd(g, v, defs)}>Markdownで書き出す</button>
       </div>
-      <p className="note">入力はこのブラウザ内に自動保存され、外部には送信されない。</p>
+      <p className="note">入力はこのブラウザ内に自動で保存され、外部には送信されません。</p>
     </section>
   );
 }

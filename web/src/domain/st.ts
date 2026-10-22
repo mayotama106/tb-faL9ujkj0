@@ -54,7 +54,8 @@ export function buildStTicket(g: Genre, v: Values, defs: Record<string, CompDef>
 
   block("basic", () => {
     if (!t(v.title)) missing++;
-    return ["## " + h.overview, "### " + h.content, "", ...lines(v.content), "", "### " + h.schedule, "", ...lines(v.schedule),
+    /* 確かめるフィーチャー(切り分けから作ると自動で入る) */
+    return ["## " + h.feature, "", bullet(0, "フィーチャー：" + (t(v.feat_name) || miss())), "", "## " + h.overview, "### " + h.content, "", ...lines(v.content), "", "### " + h.schedule, "", ...lines(v.schedule),
       "", "### " + h.env, "", ...lines(v.env)];
   });
   block("steps", () => {
@@ -63,7 +64,7 @@ export function buildStTicket(g: Genre, v: Values, defs: Record<string, CompDef>
     if (!steps.length) return out.concat("1. " + miss());
     steps.forEach((b, i) => {
       const def = defs[b.type];
-      if (!def) { out.push((i + 1) + ". (不明な部品: " + b.type + ")"); return; }
+      if (!def) { out.push((i + 1) + ". （不明な部品：" + b.type + "）"); return; }
       const hf = def.fields.find(f => f.head);
       const name = hf ? t(b[hf.id]) || miss() : def.name;
       const ls = linesOf(name);

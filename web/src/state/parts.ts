@@ -21,13 +21,13 @@ export function partsOf(g: Genre): Part[] {
     { key: FINAL, title: "仕上げ" }
   ];
   if (g.sections) return [
-    { key: "basic", title: "タイトルと" + (g.storyLabel || "概要") },
+    { key: "basic", title: "タイトル・" + (g.storyLabel || "概要") },
     ...g.sections.map(s => ({ key: "sec:" + s.key, title: s.title })),
     { key: "refs", title: h.deps + "・" + h.refs },
     { key: FINAL, title: "仕上げ" }
   ];
   return [
-    { key: "basic", title: "タイトルと" + h.story },
+    { key: "basic", title: "タイトル・" + h.story },
     { key: "kind", title: "作成区分" },
     { key: "func", title: h.func },
     { key: "nonfunc", title: h.nonfunc },

@@ -76,7 +76,7 @@ export const GENRES: Record<string, Genre> = {
   bug: {
     name: "バグチケット",
     storyLabel: "概要",
-    storyHint: "どんな不具合か(一言で)",
+    storyHint: "どんな不具合か、一言で",
     sections: [
       { key: "sym", title: "事象", nodes: [
         q("b_what", "何が起きている？", "事象"),

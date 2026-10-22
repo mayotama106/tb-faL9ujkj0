@@ -1,6 +1,6 @@
 /* チケットの切り分け: 起点 → イベント → 開発領域ごとのチケット、実施状況、Excelの表 */
 import { describe, expect, it } from "vitest";
-import { buildFeature, compOf, defaultCells, entryLabel, newItem, docValues, excelRows, EXCEL_HEADER, issuesOf, migrateFeature, newEntry, statusCount, ticketsOf, type Feature } from "./feature";
+import { buildFeature, cellsOf, compOf, newStCell, stValues, defaultCells, entryLabel, newItem, docValues, excelRows, EXCEL_HEADER, issuesOf, migrateFeature, newEntry, statusCount, ticketsOf, type Feature } from "./feature";
 import { GENRES } from "./genres";
 import { buildTicket, type Values } from "./ticket";
 import { buildXlsx, colName } from "./xlsx";
@@ -57,7 +57,7 @@ describe("チケットの切り分け", () => {
     const f = base();
     f.entries[0].events[0].cells.be.status = "完了";
     f.entries[0].events[0].cells.client.title = "書類提出画面の保存";
-    expect(statusCount(ticketsOf(f))).toEqual({ 未着手: 7, 進行中: 0, レビュー中: 0, 完了: 1 });
+    expect(statusCount(cellsOf(f))).toEqual({ 未着手: 7, 進行中: 0, レビュー中: 0, 完了: 1 });
     const rows = excelRows([f]);
     expect(rows[0]).toEqual(EXCEL_HEADER);
     expect(rows).toHaveLength(9);
@@ -136,5 +136,26 @@ describe("名前と部品の推定", () => {
   it("画面を介さない処理のチェックは BE から始める", () => {
     expect(newItem("check", key, "batch").layer).toBe("be");
     expect(newItem("check", key).layer).toBe("bff");
+  });
+});
+
+describe("フィーチャー全体のST", () => {
+  it("STのチケットは数に入り、Excelの最後の行になる。STチケットの入力値には画面・処理の一覧が入る", () => {
+    const f = { ...base(), st: { ...newStCell(), status: "進行中" as const } };
+    expect(cellsOf(f)).toHaveLength(9);
+    const rows = excelRows([f]);
+    expect(rows[rows.length - 1]).toEqual(["9", "書類のオンライン提出", "フィーチャー全体", "", "", "ST", "【ST】書類のオンライン提出のST実施", "", "進行中"]);
+    const v = stValues(f);
+    expect(v.content).toBe("書類提出画面（保存ボタン押下、初期表示）\n審査ステータス更新バッチ（毎日0時に起動）");
+    expect(buildTicket(GENRES.st, v).text).toMatch(/^## 対象のフィーチャー\n\n\* フィーチャー：書類のオンライン提出\n\n## 実施概要/);
+    expect(buildFeature(f).text).toContain("9. ［進行中］【ST】書類のオンライン提出のST実施");
+  });
+  it("前の形のフィーチャーには、STのチケットを足す", () => {
+    expect(migrateFeature({ id: "x", name: "a", entries: [] }).st).toEqual({ on: true, status: "未着手" });
+  });
+  it("バグチケットの対象のフィーチャーは任意。書いてあれば先頭に出す", () => {
+    expect(buildTicket(GENRES.bug, {}).text).toMatch(/^## 概要/);
+    expect(buildTicket(GENRES.bug, { feat_name: "住所変更", feat_part: "住所変更画面 / 変更ボタン押下 / BE" }).text)
+      .toMatch(/^## 対象のフィーチャー\n\n\* フィーチャー：住所変更\n\* 対象：住所変更画面 \/ 変更ボタン押下 \/ BE\n\n## 概要/);
   });
 });

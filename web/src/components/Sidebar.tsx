@@ -65,7 +65,7 @@ export function Sidebar() {
             </div>
           </li>
         ))}
-        {!shown.length && <li className="empty">{docs.length ? "当てはまるチケットはない。" : "まだない。「＋ 新しく作る」から始める。"}</li>}
+        {!shown.length && <li className="empty">{docs.length ? "当てはまるチケットはありません。" : "まだありません。「＋ 新しく作る」から始めます。"}</li>}
       </ul>
     </div>
   );

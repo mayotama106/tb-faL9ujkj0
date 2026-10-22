@@ -10,6 +10,7 @@ const step = (type: string, extra: Values = {}) => ({ ...newBlock(COMPONENTS[typ
 
 const v: Values = {
   title: "ファイルアップロード機能のST",
+  feat_name: "書類のオンライン提出",
   content: "ファイルアップロード機能の正常系・異常系をテストする",
   schedule: "準備 10/20〜10/21\n実施 10/22〜10/24",
   env: "ST環境",
@@ -21,7 +22,11 @@ const v: Values = {
   ac_extra: ["検出した不具合が起票されていること"]
 };
 
-const expected = `## 実施概要
+const expected = `## 対象のフィーチャー
+
+* フィーチャー：書類のオンライン提出
+
+## 実施概要
 ### 内容
 
 * ファイルアップロード機能の正常系・異常系をテストする

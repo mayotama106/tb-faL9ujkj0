@@ -21,7 +21,8 @@ export interface FCell { on: boolean; title?: string; status?: Status; docId?: s
 /* split: CLIENT と BFF を別のチケットにする(既定はまとめて1チケット) */
 export interface FEvent { _k: string; name: string; items: FItem[]; cells: Record<Layer, FCell>; split?: boolean }
 export interface FEntry { _k: string; kind: EntryKind; name: string; events: FEvent[] }
-export interface Feature { id: string; name: string; goal?: string; entries: FEntry[]; createdAt: number; updatedAt: number }
+/* st はフィーチャー全体のSTチケット(切り分けの最後に1枚) */
+export interface Feature { id: string; name: string; goal?: string; entries: FEntry[]; st?: FCell; createdAt: number; updatedAt: number }
 
 export const ENTRY_KINDS: Record<EntryKind, { name: string; event: string; ph: string; eventPh: string; first: string }> = {
   screen: { name: "画面", event: "イベント", ph: "例: 書類提出", eventPh: "例: 保存ボタン押下", first: "初期表示" },
@@ -77,12 +78,31 @@ export function ticketsOf(f: Feature): FTicket[] {
 /* チケットが、フィーチャーのどの部分か(起点 / イベント / 開発領域) */
 export const partOf = (tk: FTicket) => entryLabel(tk.entry) + " / " + (t(tk.event.name) || MISSING) + " / " + tk.lname;
 /* 実装チケットから、つながっている切り分けのチケットを指す(並べ替えてもずれないように、位置ではなく鍵で持つ) */
-export interface FeatRef { featureId: string; entry: string; event: string; layer: Layer }
+export interface FeatRef { featureId: string; entry: string; event: string; layer: Layer | "st" }
 export const refOf = (f: Feature, tk: FTicket): FeatRef => ({ featureId: f.id, entry: tk.entry._k, event: tk.event._k, layer: tk.layer });
 export const sameRef = (a: FeatRef | undefined, b: FeatRef) =>
   !!a && a.featureId === b.featureId && a.entry === b.entry && a.event === b.event && a.layer === b.layer;
-export function allTickets(features: Feature[]): { f: Feature; tk: FTicket; label: string }[] {
-  return features.flatMap(f => ticketsOf(f).map(tk => ({ f, tk, label: (t(f.name) || MISSING) + " › " + partOf(tk) })));
+/* フィーチャー全体のSTチケット */
+export const ST_PART = "フィーチャー全体 / ST";
+export const stTitle = (f: Feature) => "【ST】" + (t(f.name) || MISSING) + "のST実施";
+export const stRef = (f: Feature): FeatRef => ({ featureId: f.id, entry: "", event: "", layer: "st" });
+export const newStCell = (): FCell => ({ on: true, status: "未着手" });
+/* 実施状況を数えるチケット(開発のチケットと、フィーチャー全体のST) */
+export const cellsOf = (f: Feature): FCell[] => ticketsOf(f).map(tk => tk.cell).concat(f.st && f.st.on ? [f.st] : []);
+
+/* チケット本文から選ぶ、切り分けのチケット。impl は開発のチケット、st はフィーチャー全体のST */
+export interface PickOption { f: Feature; ref: FeatRef; label: string; name: string; part: string; cell: FCell }
+export function pickOptions(features: Feature[], kind: "impl" | "st"): PickOption[] {
+  return features.flatMap(f => kind === "st"
+    ? (f.st && f.st.on ? [{ f, ref: stRef(f), label: (t(f.name) || MISSING) + " › ST", name: t(f.name), part: ST_PART, cell: f.st }] : [])
+    : ticketsOf(f).map(tk => ({ f, ref: refOf(f, tk), label: (t(f.name) || MISSING) + " › " + partOf(tk), name: t(f.name), part: partOf(tk), cell: tk.cell })));
+}
+/* STチケットの入力値。内容には、フィーチャーの画面・処理とイベントを並べておく */
+export function stValues(f: Feature): Values {
+  return {
+    title: t(f.st && f.st.title) || stTitle(f), feat_name: t(f.name), feat_part: ST_PART, feat_ref: stRef(f),
+    content: f.entries.map(e => entryLabel(e) + "（" + e.events.map(ev => t(ev.name) || MISSING).join("、") + "）").join("\n")
+  };
 }
 /* チケットの内容(Excelの「内容」とプレビュー) */
 export function contentOf(tk: FTicket): string[] {
@@ -119,9 +139,9 @@ export function issuesOf(f: Feature): Issue[] {
 }
 
 /* 実施状況の集計 */
-export function statusCount(tks: FTicket[]): Record<Status, number> {
+export function statusCount(cells: FCell[]): Record<Status, number> {
   const c = Object.fromEntries(STATUSES.map(s => [s, 0])) as Record<Status, number>;
-  tks.forEach(tk => { c[tk.cell.status || "未着手"]++; });
+  cells.forEach(cell => { c[cell.status || "未着手"]++; });
   return c;
 }
 
@@ -169,9 +189,10 @@ export function buildFeature(f: Feature, docMissing: (id: string) => number | nu
   const bullet = (d: number, s: string) => " ".repeat(3 * d) + "* " + s;
   const issues = issuesOf(f);
   const tks = ticketsOf(f);
-  const c = statusCount(tks);
+  const cells = cellsOf(f);
+  const c = statusCount(cells);
   const blocks: Block[] = [];
-  const tree: string[] = ["## " + (t(f.name) || MISSING), "", "チケット" + tks.length + "件（" + STATUSES.map(s => s + c[s]).join("・") + "）", "", "## 洗い出し", ""];
+  const tree: string[] = ["## " + (t(f.name) || MISSING), "", "チケット" + cells.length + "件（" + STATUSES.map(s => s + c[s]).join("・") + "）", "", "## 洗い出し", ""];
   if (!f.entries.length) tree.push(bullet(0, MISSING));
   f.entries.forEach(e => {
     const k = ENTRY_KINDS[e.kind];
@@ -186,11 +207,15 @@ export function buildFeature(f: Feature, docMissing: (id: string) => number | nu
   blocks.push({ key: "parts", missing: issues.filter(i => i.part === "parts").length, lines: tree });
   const sp: string[] = ["", "## チケット", ""];
   if (!tks.length) sp.push(bullet(0, MISSING));
+  const line = (i: number, cell: FCell, title: string) => {
+    const m = cell.docId ? docMissing(cell.docId) : null;
+    return (i + 1) + ". ［" + (cell.status || "未着手") + "］" + title + (cell.docId && m != null ? "（チケット本文：" + (m ? "未記入" + m + "件" : "記入済み") + "）" : "");
+  };
   tks.forEach((tk, i) => {
-    const m = tk.cell.docId ? docMissing(tk.cell.docId) : null;
-    sp.push((i + 1) + ". ［" + (tk.cell.status || "未着手") + "］" + tk.title + (tk.cell.docId && m != null ? "（チケット本文：" + (m ? "未記入" + m + "件" : "記入済み") + "）" : ""));
+    sp.push(line(i, tk.cell, tk.title));
     contentOf(tk).forEach(x => sp.push(bullet(1, x)));
   });
+  if (f.st && f.st.on) sp.push(line(tks.length, f.st, t(f.st.title) || stTitle(f)));
   if (issues.length) sp.push("", "### 確認事項", "", ...issues.map(i => bullet(0, i.text)));
   blocks.push({ key: "split", missing: issues.filter(i => i.part === "split").length, lines: sp });
   return { text: blocks.flatMap(b => b.lines).join("\n"), missing: issues.length, blocks };
@@ -200,10 +225,13 @@ export function buildFeature(f: Feature, docMissing: (id: string) => number | nu
 export const EXCEL_HEADER = ["No", "フィーチャー", "種類", "画面・処理名", "イベント", "開発領域", "チケットタイトル", "内容（チェック・ロジック）", "実施状況"];
 export function excelRows(features: Feature[]): string[][] {
   const rows: string[][] = [EXCEL_HEADER];
-  features.forEach(f => ticketsOf(f).forEach(tk => rows.push([
-    String(rows.length), t(f.name), ENTRY_KINDS[tk.entry.kind].name, entryLabel(tk.entry), t(tk.event.name),
-    tk.lname, tk.title, contentOf(tk).join("\n"), tk.cell.status || "未着手"
-  ])));
+  features.forEach(f => {
+    ticketsOf(f).forEach(tk => rows.push([
+      String(rows.length), t(f.name), ENTRY_KINDS[tk.entry.kind].name, entryLabel(tk.entry), t(tk.event.name),
+      tk.lname, tk.title, contentOf(tk).join("\n"), tk.cell.status || "未着手"
+    ]));
+    if (f.st && f.st.on) rows.push([String(rows.length), t(f.name), "フィーチャー全体", "", "", "ST", t(f.st.title) || stTitle(f), "", f.st.status || "未着手"]);
+  });
   return rows;
 }
 
@@ -225,5 +253,6 @@ export function migrateFeature(raw: unknown): Feature {
       }))
     };
   });
-  return { id: o.id, name: t(o.name), goal: t(o.goal), entries, createdAt: o.createdAt || Date.now(), updatedAt: o.updatedAt || Date.now() };
+  const st: FCell = o.st && typeof o.st === "object" ? o.st : newStCell();
+  return { id: o.id, name: t(o.name), goal: t(o.goal), entries, st, createdAt: o.createdAt || Date.now(), updatedAt: o.updatedAt || Date.now() };
 }
