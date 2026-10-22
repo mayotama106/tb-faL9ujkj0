@@ -61,17 +61,17 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
   /* d は深さ(数値)、または "b"(箇条書き)と "n"(番号付き)の並び */
   const typesOf = (d: Depth): string[] => Array.isArray(d) ? d : Array(d).fill("b");
   const deeper = (d: Depth, t?: string) => typesOf(d).concat(t || "b");
+  /* 箇条書きは「* 」、番号付きは「1. 」(番号は finish で振り直す)。字下げは1段3文字(実装・STチケットと同じ) */
   const B = (d: Depth, s: string) => {
     const ts = typesOf(d);
-    const indent = ts.slice(0, -1).reduce((n, t) => n + (t === "n" ? 3 : 2), 0);
-    return " ".repeat(indent) + (ts[ts.length - 1] === "n" ? "1. " : "- ") + s;
+    return " ".repeat(3 * (ts.length - 1)) + (ts[ts.length - 1] === "n" ? "1. " : "* ") + s;
   };
   const str = (id: string): string => (v[id] || "").trim();
 
   /* 値を「ラベル: 値」または複数行の子箇条書きにする */
   function valued(d: Depth, label: string, val: string): string[] {
     const ls = val.split("\n").map(s => s.trim()).filter(Boolean);
-    if (ls.length === 1) return [B(d, label + ": " + esc(ls[0]))];
+    if (ls.length === 1) return [B(d, label + "：" + esc(ls[0]))];
     return [B(d, label)].concat(ls.map(l => B(deeper(d), esc(l))));
   }
   /* 見出しになる値(工程、要素名、項目など)。2行目以降は子の箇条書きにする */
@@ -87,19 +87,19 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
     const kind = str(node.id + "_kind");
     if (!kind) {
       if (sparse) return [];
-      missing++; return [B(d, node.label + ": " + MISSING)];
+      missing++; return [B(d, node.label + "：" + MISSING)];
     }
     if (kind === "その他") {
       const free = str(node.id + "_efree");
       if (free) return valued(d, node.label, free);
       if (sparse) return [B(d, node.label + ": その他")];
-      missing++; return [B(d, node.label + ": " + MISSING)];
+      missing++; return [B(d, node.label + "：" + MISSING)];
     }
-    const res = [B(d, node.label + ": " + kind)];
+    const res = [B(d, node.label + "：" + kind)];
     ([["_eid", "エラーID"], ["_emsg", "エラーメッセージ"], ["_elog", "ログレベル"]] as const).forEach(([suf, label]) => {
       const val = str(node.id + suf);
       if (val) res.push(...valued(d + 1, label, val));
-      else if (!sparse) { missing++; res.push(B(d + 1, label + ": " + MISSING)); }
+      else if (!sparse) { missing++; res.push(B(d + 1, label + "：" + MISSING)); }
     });
     if (kind === "エラー画面") res.push(...etc(node.id + "_eetc", d + 1));
     return res;
@@ -109,19 +109,19 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
     const kind = (o.ek || "").trim();
     if (!kind) {
       if (sparse) return [];
-      missing++; return [B(ts, label + ": " + MISSING)];
+      missing++; return [B(ts, label + "：" + MISSING)];
     }
     if (kind === "その他") {
       const freeText = (o.efree || "").trim();
       if (freeText) return valued(ts, label, freeText);
       if (sparse) return [B(ts, label + ": その他")];
-      missing++; return [B(ts, label + ": " + MISSING)];
+      missing++; return [B(ts, label + "：" + MISSING)];
     }
-    const res = [B(ts, label + ": " + kind)];
+    const res = [B(ts, label + "：" + kind)];
     ([["eid", "エラーID"], ["emsg", "エラーメッセージ"], ["elog", "ログレベル"]] as const).forEach(([key, l]) => {
       const val = (o[key] || "").trim();
       if (val) res.push(...valued(deeper(ts), l, val));
-      else if (!sparse) { missing++; res.push(B(deeper(ts), l + ": " + MISSING)); }
+      else if (!sparse) { missing++; res.push(B(deeper(ts), l + "：" + MISSING)); }
     });
     const extra = (o.eetc || "").trim();
     if (kind === "エラー画面" && extra) res.push(...valued(deeper(ts), "その他", extra));
@@ -133,7 +133,7 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
     const src = node.src || LOGIC_SRC;
     if (link) return valued(d, src, link);
     if (sparse) return [];
-    missing++; return [B(d, src + ": " + MISSING)];
+    missing++; return [B(d, src + "：" + MISSING)];
   }
   /* 画面の要素。1要素ごとに、種類、スタイリング、型、不正時、表示条件を持つ */
   function elementsLines(node: QNode, d: number, sparse: boolean): string[] {
@@ -148,7 +148,7 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
         const add = (label: string, raw: string) => {
           const val = (raw || "").trim();
           if (val) body.push(...valued(d + 2, label, val));
-          else if (!sparse) { missing++; body.push(B(d + 2, label + ": " + MISSING)); }
+          else if (!sparse) { missing++; body.push(B(d + 2, label + "：" + MISSING)); }
         };
         add("種類", e.kind);
         add("スタイリング", e.style);
@@ -186,7 +186,7 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
       ([["then", "満たす場合"], ["else", "満たさない場合"]] as const).forEach(([key, label]) => {
         const ls = stepsLines(step[key], deeper(deeper(ts), "n"), sparse);
         if (ls.length) body.push(B(deeper(ts), label), ...ls);
-        else if (!sparse) { missing++; body.push(B(deeper(ts), label + ": " + MISSING)); }
+        else if (!sparse) { missing++; body.push(B(deeper(ts), label + "：" + MISSING)); }
       });
     } else {
       body = stepsLines(step.kids, deeper(ts, "n"), sparse);
@@ -207,7 +207,7 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
     const has = node.noHas ? HAS : str(node.id + "_has");
     if (!has) {
       if (sparse) return [];
-      missing++; return [B(d, node.label + ": " + MISSING)];
+      missing++; return [B(d, node.label + "：" + MISSING)];
     }
     if (has === HAS_NOT) return [B(d, node.label + ": なし")];
     let kids: string[];
@@ -263,7 +263,7 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
         const srcLabel = g.srcLabel || LOGIC_SRC;
         if (link) kids = valued(d + 1, srcLabel, link);
         else if (sparse) kids = [];
-        else { missing++; kids = [B(d + 1, srcLabel + ": " + MISSING)]; }
+        else { missing++; kids = [B(d + 1, srcLabel + "：" + MISSING)]; }
         kids = kids.concat(node.refChildren.flatMap(c => lines(c, d + 1)));
       } else {
         kids = (node.children || []).flatMap(c => lines(c, d + 1));
@@ -273,20 +273,21 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
       return [B(d, node.label)].concat(kids);
     }
     const val = valueOf(node, v);
+    const shown = (node.shown && node.shown[val]) || val;   /* 選択肢の、本文での書き方(ある → あり など) */
     const kids = kidsOf(node, val).flatMap(c => lines(c, d + 1)).concat(etc(etcId(node, val), d + 1));
     if (!val) {
       if (sparse) return kids.length ? [B(d, node.label)].concat(kids) : [];
       missing++;
-      return [B(d, node.label + ": " + MISSING)].concat(kids);
+      return [B(d, node.label + "：" + MISSING)].concat(kids);
     }
     if (node.type === "list")
       return [B(d, node.label)].concat(listItems(v[node.id]).flatMap(l => headed(node.numbered ? deeper(d, "n") : d + 1, l)), kids);
-    return valued(d, node.label, val).concat(kids);
+    return valued(d, node.label, shown).concat(kids);
   }
   function free(id: string): string[] {
     const val = str(id);
-    if (!val) { missing++; return [MISSING]; }
-    return val.split("\n").map(l => esc(l.replace(/\s+$/, "")));
+    if (!val) { missing++; return ["* " + MISSING]; }
+    return val.split("\n").map(l => l.trim()).filter(Boolean).map(l => "* " + esc(l));
   }
 
   /* ブロックを1つ作る。作る間に数えた未記入を、そのブロックの件数にする */
@@ -302,15 +303,15 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
 
   /* 節の構成を自前で持つジャンル(バグチケット) */
   if (g.sections) {
-    block("basic", () => [H(3, g.storyLabel || "ストーリー"), ...free("story")]);
+    block("basic", () => [H(2, g.storyLabel || "ストーリー"), "", ...free("story")]);
     titleBlock();
     g.sections.forEach(sec => block("sec:" + sec.key, () => {
-      const o = ["", H(3, sec.title)];
+      const o = ["", H(2, sec.title), ""];
       if (sec.lead) o.push(B(1, sec.lead));
       o.push(...sec.nodes.flatMap(n => lines(n, 1)), ...etc(sec.key + "__etc", 1));
       return o;
     }));
-    block("refs", () => ["", H(3, h.deps), ...free("deps"), "", H(3, h.refs), ...free("refs")]);
+    block("refs", () => ["", H(2, h.deps), "", ...free("deps"), "", H(2, h.refs), "", ...free("refs")]);
     return finish();
   }
 
@@ -340,6 +341,22 @@ export function buildTicket(g: Genre, v: Values = {}, defs?: Record<string, Comp
   return finish();
 
   function finish(): Ticket {
+    blocks.forEach(b => { b.lines = renumber(b.lines); });
     return { text: blocks.flatMap(b => b.lines).join("\n"), missing, blocks };
   }
+}
+
+/* 番号付きの箇条書きに、字下げごとに 1. 2. 3. と番号を振り直す。同じ字下げの「* 」や、箇条書きでない行で数え直す */
+export function renumber(lines: string[]): string[] {
+  const count = new Map<number, number>();
+  return lines.map(l => {
+    const m = /^( *)(\d+)\. (.*)$/.exec(l), b = /^( *)\* /.exec(l);
+    if (!m && !b) { count.clear(); return l; }
+    const ind = (m || b)![1].length;
+    [...count.keys()].forEach(k => { if (k > ind) count.delete(k); });
+    if (!m) { count.delete(ind); return l; }
+    const n = (count.get(ind) || 0) + 1;
+    count.set(ind, n);
+    return m[1] + n + ". " + m[3];
+  });
 }

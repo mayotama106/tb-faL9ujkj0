@@ -14,6 +14,7 @@ export interface QNode {
   options?: string[];
   ph?: string;
   numbered?: boolean;
+  shown?: Record<string, string>;   /* 選択肢の、本文での書き方 */
   optional?: boolean;
   always?: boolean;
   noHas?: boolean;
@@ -86,11 +87,11 @@ export const GENRES: Record<string, Genre> = {
         { id: "b_freq", q: "どのくらいの頻度で起きる？", label: "発生頻度", type: "choice",
           options: ["毎回", "ときどき", "一度だけ"] },
         q("b_impact", "誰に、どの機能に影響する？", "影響範囲"),
-        { id: "b_wa", q: "回避策はある？", label: "回避策", type: "choice", options: ["ある", "ない"],
+        { id: "b_wa", q: "回避策はある？", label: "回避策", type: "choice", options: ["ある", "ない"], shown: { "ある": "あり", "ない": "なし" },
           branches: { "ある": [q("b_wa_how", "どう回避する？", "回避の方法")] } }
       ] },
       { key: "cause", title: "原因", nodes: [
-        { id: "b_cause", q: "原因は判明している？", label: "原因", type: "choice", options: ["判明している", "調査中"],
+        { id: "b_cause", q: "原因は判明している？", label: "原因", type: "choice", options: ["判明している", "調査中"], shown: { "判明している": "判明" },
           branches: { "判明している": [list("b_fact", "確認済みの事実は？", "確認済みの事実", "事実")] } },
         q("b_guess", "推測していることは？(任意)", "推測", { optional: true })
       ] },
@@ -98,7 +99,7 @@ export const GENRES: Record<string, Genre> = {
         list("b_check", "修正後に確認することは？", "修正後の確認項目", "確認すること"),
         q("b_side", "修正はどこに影響する？", "修正の影響範囲"),
         { id: "b_test", q: "再発を防ぐテストは追加する？", label: "再発防止のテスト", type: "choice",
-          options: ["追加する", "追加しない"],
+          options: ["追加する", "追加しない"], shown: { "追加する": "あり", "追加しない": "なし" },
           branches: { "追加する": [q("b_test_what", "どのテストを追加する？", "追加するテスト")],
                       "追加しない": [q("b_test_why", "追加しない理由は？", "追加しない理由")] } }
       ] }
