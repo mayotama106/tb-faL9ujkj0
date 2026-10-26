@@ -3,26 +3,27 @@
    洗い出しの木:
      画面・処理(画面、または画面を介さないもの: バッチ・外部からの呼び出し・その他)
        └ イベント(画面以外は、実行のきっかけ・呼び出し)
-           └ チェック / ロジック(どの開発領域で実装するか、エラーハンドリングの有無)
-   チケット:
-     チェック・ロジック1つにつき1枚(エラーハンドリングありなら、そのチケットの中で扱う)
-     画面1つにつき「画面の作成」1枚(画面の表示・要素・イベントの受け付け)
-     フィーチャー全体のST 1枚 */
+           └ チェック / ロジック(CLIENT・BFF か BE か、エラーハンドリングの有無)
+   チケット(イベントごと):
+     CLIENT・BFF 1枚(画面のイベントだけ。CLIENT・BFF のチェック・ロジックをまとめる)
+     BE チェック・ロジック1つにつき1枚
+     エラーハンドリング 1枚(エラーハンドリングありのチェック・ロジックをまとめる)
+   ほかに、フィーチャー全体のST 1枚 */
 import { COMPONENTS, newBlock } from "./components";
 import { MISSING } from "./genres";
 import type { Block, Ticket, Values } from "./ticket";
 
 export type EntryKind = "screen" | "batch" | "api" | "other";
-/* チェック・ロジックを実装する開発領域。front は CLIENT と BFF をまとめたもの(まとめることが多い) */
-export type Layer = "front" | "client" | "bff" | "be";
+/* チェック・ロジックを実装する開発領域。front は CLIENT・BFF */
+export type Layer = "front" | "be";
 export type Status = "未着手" | "進行中" | "レビュー中" | "完了";
 
 export interface FCell { on: boolean; title?: string; status?: Status; docId?: string }
-/* cell はこのチェック・ロジックのチケット */
+/* cell は BE のチェック・ロジックのチケット(BE は1つにつき1枚) */
 export interface FItem { _k: string; kind: "check" | "logic"; name: string; layer: Layer; err?: "" | "あり" | "なし"; errNote?: string; cell?: FCell }
-export interface FEvent { _k: string; name: string; items: FItem[] }
-/* cell は画面の「画面の作成」のチケット(画面のときだけ) */
-export interface FEntry { _k: string; kind: EntryKind; name: string; events: FEvent[]; cell?: FCell }
+/* cells はイベントのチケット(CLIENT・BFF とエラーハンドリング) */
+export interface FEvent { _k: string; name: string; items: FItem[]; cells?: { front?: FCell; err?: FCell } }
+export interface FEntry { _k: string; kind: EntryKind; name: string; events: FEvent[] }
 /* st はフィーチャー全体のSTチケット(切り分けの最後に1枚) */
 export interface Feature { id: string; name: string; goal?: string; entries: FEntry[]; st?: FCell; createdAt: number; updatedAt: number }
 
@@ -33,11 +34,11 @@ export const ENTRY_KINDS: Record<EntryKind, { name: string; event: string; ph: s
   other: { name: "その他", event: "きっかけ", ph: "例: 管理者の手動実行", eventPh: "例: 管理画面から再送を指示", first: "" }
 };
 export const FRONT = "CLIENT・BFF";
-export const LAYERS: Record<Layer, string> = { front: FRONT, client: "CLIENT", bff: "BFF", be: "BE" };
+export const ERR = "エラーハンドリング";
+export const LAYERS: Record<Layer, string> = { front: FRONT, be: "BE" };
 export const LAYER_KEYS = Object.keys(LAYERS) as Layer[];
 export const STATUSES: Status[] = ["未着手", "進行中", "レビュー中", "完了"];
 export const ITEM_KINDS = { check: "チェック", logic: "ロジック" } as const;
-export const SCREEN_TICKET = "画面の作成";
 
 const t = (s: unknown) => (typeof s === "string" ? s : "").trim();
 /* 画面の名前。「住所変更」でも「住所変更画面」でも、「住所変更画面」と書く */
@@ -45,47 +46,51 @@ const screenBase = (name: string) => name.replace(/\s*画面$/, "");
 export const entryLabel = (e: FEntry) => (e.kind === "screen" ? (screenBase(t(e.name)) || MISSING) + "画面" : t(e.name) || MISSING);
 
 export const newCell = (): FCell => ({ on: true, status: "未着手" });
-export const newEvent = (_kind: EntryKind, name: string, key: () => string): FEvent => ({ _k: key(), name, items: [] });
-/* 画面・処理を足すときは、イベントも1つ足す(画面は「初期表示」)。画面には「画面の作成」のチケットを付ける */
-export const newEntry = (kind: EntryKind, key: () => string): FEntry => ({
-  _k: key(), kind, name: "", events: [newEvent(kind, ENTRY_KINDS[kind].first, key)], ...(kind === "screen" ? { cell: newCell() } : {})
-});
+/* イベントには、CLIENT・BFF(画面のときだけ)とエラーハンドリングのチケットを付ける */
+export const eventCells = (kind: EntryKind) => ({ ...(kind === "screen" ? { front: newCell() } : {}), err: newCell() });
+export const newEvent = (kind: EntryKind, name: string, key: () => string): FEvent => ({ _k: key(), name, items: [], cells: eventCells(kind) });
+/* 画面・処理を足すときは、イベントも1つ足す(画面は「初期表示」) */
+export const newEntry = (kind: EntryKind, key: () => string): FEntry => ({ _k: key(), kind, name: "", events: [newEvent(kind, ENTRY_KINDS[kind].first, key)] });
 /* 画面のチェックは CLIENT・BFF、それ以外は BE から始める(画面を介さない処理は BE だけ) */
 export const newItem = (kind: FItem["kind"], key: () => string, entry: EntryKind = "screen"): FItem =>
   ({ _k: key(), kind, name: "", layer: kind === "check" && entry === "screen" ? "front" : "be", err: "", cell: newCell() });
 
-/* チケットの一覧。kind: screen は画面の作成、item はチェック・ロジック1つ */
+/* チケットの一覧。kind: front は CLIENT・BFF、be は BE のチェック・ロジック1つ、err はエラーハンドリング */
 export interface FTicket {
-  kind: "screen" | "item"; entry: FEntry; event?: FEvent; item?: FItem;
+  kind: "front" | "be" | "err"; entry: FEntry; event: FEvent; item?: FItem; items: FItem[];
   lname: string; cell: FCell; title: string;
   path: (string | number)[];   /* フィーチャーの中の、このチケット(cell)の位置 */
 }
-export function defaultTitle(e: FEntry, ev?: FEvent, it?: FItem) {
-  if (!ev || !it) return "【CLIENT】" + entryLabel(e) + "の作成";
-  return "【" + LAYERS[it.layer] + "】" + entryLabel(e) + " " + (t(ev.name) || MISSING) + "：" + (t(it.name) || MISSING);
+const lnameOf = (k: FTicket["kind"]) => (k === "front" ? FRONT : k === "be" ? "BE" : ERR);
+export function defaultTitle(e: FEntry, ev: FEvent, k: FTicket["kind"], it?: FItem) {
+  return "【" + lnameOf(k) + "】" + entryLabel(e) + " " + (t(ev.name) || MISSING) + (k === "be" ? "：" + (t(it && it.name) || MISSING) : "");
 }
 export function ticketsOf(f: Feature): FTicket[] {
-  return f.entries.flatMap((e, i) => {
+  return f.entries.flatMap((e, i) => e.events.flatMap((ev, j) => {
     const out: FTicket[] = [];
-    if (e.kind === "screen" && e.cell && e.cell.on)
-      out.push({ kind: "screen", entry: e, lname: "CLIENT", cell: e.cell, title: t(e.cell.title) || defaultTitle(e), path: ["entries", i, "cell"] });
-    e.events.forEach((ev, j) => ev.items.forEach((it, n) => {
-      if (it.cell && it.cell.on)
-        out.push({ kind: "item", entry: e, event: ev, item: it, lname: LAYERS[it.layer], cell: it.cell, title: t(it.cell.title) || defaultTitle(e, ev, it),
-          path: ["entries", i, "events", j, "items", n, "cell"] });
-    }));
+    const at = (...p: (string | number)[]) => ["entries", i, "events", j, ...p];
+    const front = e.kind === "screen" && ev.cells && ev.cells.front;
+    if (front && front.on)
+      out.push({ kind: "front", entry: e, event: ev, items: ev.items.filter(it => it.layer === "front"), lname: FRONT, cell: front,
+        title: t(front.title) || defaultTitle(e, ev, "front"), path: at("cells", "front") });
+    ev.items.forEach((it, n) => {
+      if ((it.layer === "be" || e.kind !== "screen") && it.cell && it.cell.on)
+        out.push({ kind: "be", entry: e, event: ev, item: it, items: [it], lname: "BE", cell: it.cell,
+          title: t(it.cell.title) || defaultTitle(e, ev, "be", it), path: at("items", n, "cell") });
+    });
+    const err = ev.cells && ev.cells.err;
+    if (err && err.on)
+      out.push({ kind: "err", entry: e, event: ev, items: ev.items.filter(it => it.err === "あり"), lname: ERR, cell: err,
+        title: t(err.title) || defaultTitle(e, ev, "err"), path: at("cells", "err") });
     return out;
-  });
+  }));
 }
-/* チケットが、フィーチャーのどの部分か(画面・処理 / イベント / チェック・ロジック / 開発領域) */
-export const partOf = (tk: FTicket) => tk.kind === "screen"
-  ? entryLabel(tk.entry) + " / " + SCREEN_TICKET + " / CLIENT"
-  : entryLabel(tk.entry) + " / " + (t(tk.event!.name) || MISSING) + " / " + (t(tk.item!.name) || MISSING) + " / " + tk.lname;
+/* チケットが、フィーチャーのどの部分か(画面・処理 / イベント / [BEはチェック・ロジック /] 開発領域) */
+export const partOf = (tk: FTicket) => entryLabel(tk.entry) + " / " + (t(tk.event.name) || MISSING) + " / " +
+  (tk.kind === "be" ? (t(tk.item!.name) || MISSING) + " / " : "") + tk.lname;
 /* 実装チケットから、つながっている切り分けのチケットを指す(並べ替えてもずれないように、位置ではなく鍵で持つ) */
 export interface FeatRef { featureId: string; entry: string; event: string; layer: string; item?: string }
-export const refOf = (f: Feature, tk: FTicket): FeatRef => tk.kind === "screen"
-  ? { featureId: f.id, entry: tk.entry._k, event: "", layer: "screen" }
-  : { featureId: f.id, entry: tk.entry._k, event: tk.event!._k, layer: "item", item: tk.item!._k };
+export const refOf = (f: Feature, tk: FTicket): FeatRef => ({ featureId: f.id, entry: tk.entry._k, event: tk.event._k, layer: tk.kind, ...(tk.kind === "be" ? { item: tk.item!._k } : {}) });
 export const sameRef = (a: FeatRef | undefined, b: FeatRef) =>
   !!a && a.featureId === b.featureId && a.entry === b.entry && a.event === b.event && a.layer === b.layer && (a.item || "") === (b.item || "");
 /* フィーチャー全体のSTチケット */
@@ -94,7 +99,8 @@ export const stTitle = (f: Feature) => "【ST】" + (t(f.name) || MISSING) + "�
 export const stRef = (f: Feature): FeatRef => ({ featureId: f.id, entry: "", event: "", layer: "st" });
 export const newStCell = newCell;
 /* フィーチャーの中のチケットの枠をすべて(外したものも含む)。受け渡しでチケット本文のつながりを辿るときに使う */
-export const allCells = (f: Feature): FCell[] => f.entries.flatMap(e => (e.cell ? [e.cell] : []).concat(e.events.flatMap(ev => ev.items.flatMap(it => (it.cell ? [it.cell] : []))))).concat(f.st ? [f.st] : []);
+export const allCells = (f: Feature): FCell[] => f.entries.flatMap(e => e.events.flatMap(ev =>
+  [ev.cells && ev.cells.front, ev.cells && ev.cells.err, ...ev.items.map(it => it.cell)].filter((c): c is FCell => !!c))).concat(f.st ? [f.st] : []);
 /* 実施状況を数えるチケット(開発のチケットと、フィーチャー全体のST) */
 export const cellsOf = (f: Feature): FCell[] => ticketsOf(f).map(tk => tk.cell).concat(f.st && f.st.on ? [f.st] : []);
 
@@ -114,10 +120,9 @@ export function stValues(f: Feature): Values {
 }
 /* チケットの内容(Excelの「内容」とプレビュー) */
 export function contentOf(tk: FTicket): string[] {
-  if (tk.kind === "screen") return ["画面の表示と、イベントの受け付け（" + (tk.entry.events.map(ev => t(ev.name) || MISSING).join("、") || MISSING) + "）"];
-  const it = tk.item!;
-  return [ITEM_KINDS[it.kind] + "：" + (t(it.name) || MISSING)]
-    .concat(it.err === "あり" ? ["エラーハンドリング：あり" + (t(it.errNote) ? "（" + t(it.errNote) + "）" : "")] : []);
+  return tk.items.map(it => tk.kind === "err"
+    ? (t(it.name) || MISSING) + (tk.entry.kind === "screen" ? "（" + LAYERS[it.layer] + "）" : "") + (t(it.errNote) ? "：" + t(it.errNote) : "")
+    : ITEM_KINDS[it.kind] + "：" + (t(it.name) || MISSING));
 }
 
 /* 確認事項(漏れ・決まっていないこと)。part は直すパート */
@@ -133,11 +138,14 @@ export function issuesOf(f: Feature): Issue[] {
     e.events.forEach(ev => {
       const where = entryLabel(e) + " / " + (t(ev.name) || MISSING);
       if (!t(ev.name)) out.push({ part: "parts", text: entryLabel(e) + "の" + k.event + "の名前が未記入" });
-      /* 画面のイベントは「画面の作成」で受け付けるので、チェック・ロジックがなくてもよい */
-      if (e.kind !== "screen" && !ev.items.length) out.push({ part: "parts", text: where + "にチェック・ロジックが1つもない" });
       ev.items.forEach(it => {
+        const name = "「" + (t(it.name) || MISSING) + "」（" + where + "）";
         if (!t(it.name)) out.push({ part: "parts", text: where + "の" + ITEM_KINDS[it.kind] + "の名前が未記入" });
-        if (!it.err) out.push({ part: "parts", text: "「" + (t(it.name) || MISSING) + "」（" + where + "）：エラーハンドリングの有無が未定" });
+        if (!it.err) out.push({ part: "parts", text: name + "：エラーハンドリングの有無が未定" });
+        if (e.kind === "screen" && it.layer === "front" && !(ev.cells && ev.cells.front && ev.cells.front.on))
+          out.push({ part: "split", text: name + "：" + FRONT + "で実装するが、" + FRONT + "のチケットがない" });
+        if (it.err === "あり" && !(ev.cells && ev.cells.err && ev.cells.err.on))
+          out.push({ part: "split", text: name + "：エラーハンドリングありだが、エラーハンドリングのチケットがない" });
       });
     });
   });
@@ -151,37 +159,36 @@ export function statusCount(cells: FCell[]): Record<Status, number> {
   return c;
 }
 
-/* チケットから、チケットビルダーの実装チケットの入力値を作る。
-   画面の作成は、画面作成の部品(画面の要素・初期表示・イベントの受け付け)。
-   チェック・ロジックは、その1つを部品にする。エラーハンドリングありなら、そのチケットの中でエラーも扱う */
+/* チケットから、チケットビルダーの実装チケットの入力値を作る。チェック・ロジックを部品にして入れておく。
+   CLIENT・BFF は画面作成の部品のイベント(初期表示なら初期表示)に入れる。BE はそのチェック・ロジック1つ。
+   エラーハンドリングは、ありのものを1つずつエラーハンドリングの部品にする */
 export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
-  const base = {
-    _impl: 1, title: tk.title, feat_title: tk.title, story_goal: t(f.goal),
-    feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk)
-  };
-  if (tk.kind === "screen") {
-    const events = tk.entry.events.filter(ev => t(ev.name) !== ENTRY_KINDS.screen.first)
-      .map(ev => ({ _k: key(), name: t(ev.name), trig: trigOf(t(ev.name)), steps: [] }));
-    return { ...base, proc_name: "",
-      blocks: [{ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)), events, only_init: !events.length }] };
-  }
-  const it = tk.item!, ev = tk.event!;
   const steps: Values[] = [];
-  if (it.kind === "check") {
-    /* チェックの「エラーになる場合」は、チェックの行のエラーの欄で書く。理由があれば詳細に入れる */
-    steps.push({ ...newBlock(COMPONENTS.check, key), name: t(it.name), items: [{ _k: key(), name: t(it.name), detail: it.err === "あり" ? t(it.errNote) : "", err: {} }] });
-  } else {
-    steps.push({ ...newBlock(COMPONENTS[compOf(t(it.name))], key), name: t(it.name) });
-    if (it.err === "あり") steps.push({ ...newBlock(COMPONENTS.error, key), when: errWhen(it), err: {} });
+  let checks: Values | null = null;
+  tk.items.forEach(it => {
+    if (tk.kind === "err") {
+      steps.push({ ...newBlock(COMPONENTS.error, key), when: errWhen(it), err: {} });
+    } else if (it.kind === "check") {
+      if (!checks) { checks = { ...newBlock(COMPONENTS.check, key), name: "", items: [] }; steps.push(checks); }
+      (checks.items as Values[]).push({ _k: key(), name: t(it.name), detail: "", err: {} });
+    } else {
+      steps.push({ ...newBlock(COMPONENTS[compOf(t(it.name))], key), name: t(it.name) });
+    }
+  });
+  /* チェックが1つならその名前を、複数なら「〇〇時のチェック」をチェック群の名前にする */
+  if (checks) {
+    const c = checks as Values, items = c.items as Values[];
+    c.name = items.length === 1 ? items[0].name : (t(tk.event.name) || MISSING) + "時のチェック";
   }
-  /* 画面側(CLIENT)のチェック・ロジックは、画面作成の部品のイベントの処理に入れる(画面全体の仕様は「画面の作成」のチケットで書く) */
-  if (tk.entry.kind === "screen" && (it.layer === "front" || it.layer === "client")) {
-    const init = t(ev.name) === ENTRY_KINDS.screen.first;
-    return { ...base, proc_name: "",
-      blocks: [{ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)), only_events: true,
-        ...(init ? { init: steps, events: [] } : { events: [{ _k: key(), name: t(ev.name), trig: trigOf(t(ev.name)), steps }] }) }] };
+  const base = { _impl: 1, title: tk.title, feat_title: tk.title, story_goal: t(f.goal), feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk) };
+  /* 画面の CLIENT・BFF は画面作成の部品に入れる。画面全体の仕様は最初のイベントのチケットで書き、ほかのイベントでは任意にする */
+  if (tk.kind === "front" && tk.entry.kind === "screen") {
+    const first = tk.entry.events[0] === tk.event;
+    const init = t(tk.event.name) === ENTRY_KINDS.screen.first;
+    return { ...base, proc_name: "", blocks: [{ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)),
+      ...(init ? { init: steps, events: [], only_init: true } : { only_events: !first, events: [{ _k: key(), name: t(tk.event.name), trig: trigOf(t(tk.event.name)), steps }] }) }] };
   }
-  return { ...base, proc_name: t(ev.name), blocks: steps };
+  return { ...base, proc_name: t(tk.event.name), blocks: steps };
 }
 
 /* エラーハンドリングのチケットの「どんな場合？」。理由があれば「理由場合（チェック名）」、なければ「チェック名でエラーになる場合」 */
@@ -225,7 +232,7 @@ export function buildFeature(f: Feature, docMissing: (id: string) => number | nu
       tree.push(bullet(1, k.event + "：" + (t(ev.name) || MISSING)));
       /* 開発領域とエラーハンドリングは［ ］にまとめ、「／」で区切る(名前の括弧や CLIENT・BFF の「・」とぶつからないように) */
       ev.items.forEach(it => tree.push(bullet(2, ITEM_KINDS[it.kind] + "：" + (t(it.name) || MISSING) +
-        "［" + LAYERS[it.layer] + "／エラーハンドリング" + (it.err || "未定") + "］" + (it.cell && it.cell.on ? "" : "（チケットなし）"))));
+        "［" + (e.kind === "screen" ? LAYERS[it.layer] : "BE") + "／エラーハンドリング" + (it.err || "未定") + "］")));
     });
   });
   blocks.push({ key: "parts", missing: issues.filter(i => i.part === "parts").length, lines: tree });
@@ -251,7 +258,7 @@ export function excelRows(features: Feature[]): string[][] {
   const rows: string[][] = [EXCEL_HEADER];
   features.forEach(f => {
     ticketsOf(f).forEach(tk => rows.push([
-      String(rows.length), t(f.name), ENTRY_KINDS[tk.entry.kind].name, entryLabel(tk.entry), tk.event ? t(tk.event.name) : SCREEN_TICKET,
+      String(rows.length), t(f.name), ENTRY_KINDS[tk.entry.kind].name, entryLabel(tk.entry), t(tk.event.name),
       tk.lname, tk.title, contentOf(tk).join("\n"), tk.cell.status || "未着手"
     ]));
     if (f.st && f.st.on) rows.push([String(rows.length), t(f.name), "フィーチャー全体", "", "", "ST", t(f.st.title) || stTitle(f), "", f.st.status || "未着手"]);
@@ -260,38 +267,43 @@ export function excelRows(features: Feature[]): string[][] {
 }
 
 /* 前の形のフィーチャーを、今の形に移す。
-   前の形(イベント×開発領域で1チケット、ev.cells)からは、チェック・ロジックごとのチケットに移す。
-   実施状況は、そのチェック・ロジックが入っていたチケットのものを引き継ぎ、チケット本文のつながりは最初の1つに移す */
+   ・イベント×開発領域で1チケット(ev.cells の client・bff・be・err): CLIENT・BFF とエラーハンドリングはそのまま、BE はチェック・ロジックごとに分ける
+   ・チェック・ロジックごとに1チケット(it.cell、画面の作成 e.cell): CLIENT・BFF のものはイベントの CLIENT・BFF にまとめる
+   実施状況は引き継ぎ、チケット本文のつながりは1つにだけ移す */
 export function migrateFeature(raw: unknown): Feature {
   const o = (raw || {}) as Values;
   const rnd = () => Math.random().toString(36).slice(2, 10);
-  const cellOf = (c: Values | undefined): FCell => (c && typeof c === "object"
-    ? { on: c.on !== false, status: STATUSES.includes(c.status) ? c.status : "未着手", ...(t(c.title) ? { title: t(c.title) } : {}), ...(c.docId ? { docId: c.docId } : {}) }
+  const cellOf = (c: Values | undefined, keepDoc = true): FCell => (c && typeof c === "object"
+    ? { on: c.on !== false, status: STATUSES.includes(c.status) ? c.status : "未着手", ...(t(c.title) ? { title: t(c.title) } : {}), ...(keepDoc && c.docId ? { docId: c.docId } : {}) }
     : newCell());
   const entries: FEntry[] = (Array.isArray(o.entries) ? o.entries : []).map((e: Values) => {
     const kind: EntryKind = ENTRY_KINDS[e.kind as EntryKind] ? e.kind : "other";
     const events: FEvent[] = (Array.isArray(e.events) ? e.events : []).map((ev: Values) => {
-      const used = new Set<string>();
-      const items: FItem[] = (Array.isArray(ev.items) ? ev.items : []).map((it: Values) => {
-        const old: string = it.layer;
-        /* 前の形の client・bff は、CLIENT と BFF を分けていなければ「CLIENT・BFF」 */
-        const layer: Layer = old === "front" || old === "be" ? old
-          : old === "client" || old === "bff" ? (ev.split ? old : "front")
-          : it.kind === "check" && kind === "screen" ? "front" : "be";
-        let cell: FCell;
-        if (it.cell) cell = cellOf(it.cell);
-        else {
-          const key = old === "be" ? "be" : ev.split ? old : "client";
-          const oc = ev.cells && ev.cells[key];
-          cell = cellOf(oc ? { ...oc, on: true, title: "" } : undefined);
-          if (oc && oc.docId && !used.has(key)) used.add(key); else delete cell.docId;
-        }
-        return { _k: it._k || rnd(), kind: it.kind === "check" ? "check" : "logic", name: t(it.name), layer: kind === "screen" ? layer : "be",
+      const oc: Values = ev.cells && typeof ev.cells === "object" ? ev.cells : {};
+      const rawItems: Values[] = Array.isArray(ev.items) ? ev.items : [];
+      const layerOf = (it: Values): Layer => (kind !== "screen" ? "be" : it.layer === "be" ? "be" : it.layer === "front" || it.layer === "client" || it.layer === "bff" ? "front" : it.kind === "check" ? "front" : "be");
+      let beDocUsed = false;
+      const items: FItem[] = rawItems.map(it => {
+        const layer = layerOf(it);
+        let cell: FCell | undefined;
+        if (it.cell) cell = cellOf(it.cell, layer === "be");
+        else if (layer === "be") {
+          /* イベント×開発領域の BE のチケットから、状況を引き継ぐ。チケット本文は最初のものにだけ */
+          cell = cellOf(oc.be ? { ...oc.be, on: true, title: "" } : undefined, !beDocUsed);
+          if (oc.be && oc.be.docId) beDocUsed = true;
+        } else cell = newCell();
+        return { _k: it._k || rnd(), kind: it.kind === "check" ? "check" : "logic", name: t(it.name), layer,
           err: it.err === "あり" || it.err === "なし" ? it.err : "", errNote: t(it.errNote), cell };
       });
-      return { _k: ev._k || rnd(), name: t(ev.name), items };
+      /* CLIENT・BFF: 前のイベントの client(または front)、なければ CLIENT・BFF のチェック・ロジックのチケットから */
+      const firstFront = rawItems.find(it => it.cell && layerOf(it) === "front");
+      const cells = {
+        ...(kind === "screen" ? { front: cellOf(oc.front || oc.client || (firstFront && firstFront.cell)) } : {}),
+        err: cellOf(oc.err)
+      };
+      return { _k: ev._k || rnd(), name: t(ev.name), items, cells };
     });
-    return { _k: e._k || rnd(), kind, name: t(e.name), events, ...(kind === "screen" ? { cell: cellOf(e.cell) } : {}) };
+    return { _k: e._k || rnd(), kind, name: t(e.name), events };
   });
   const st: FCell = o.st && typeof o.st === "object" ? o.st : newStCell();
   return { id: o.id, name: t(o.name), goal: t(o.goal), entries, st, createdAt: o.createdAt || Date.now(), updatedAt: o.updatedAt || Date.now() };
