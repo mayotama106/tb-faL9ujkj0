@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildFeature, cellsOf, compOf, contentOf, docValues, entryLabel, errWhen, eventCells, excelRows, EXCEL_HEADER, issuesOf, migrateFeature, newCell, newEntry, newItem,
-  newStCell, relinkDocs, statusCount, stValues, ticketsOf, trigOf, type Feature, type FItem
+  newStCell, partOf, relinkDocs, statusCount, stValues, ticketsOf, trigOf, type Feature, type FItem
 } from "./feature";
 import { GENRES } from "./genres";
 import { buildTicket, type Values } from "./ticket";
@@ -30,8 +30,8 @@ describe("チケットの切り分け", () => {
   it("画面を足すと初期表示のイベントができ、エラーハンドリングのチケットが付く", () => {
     const e = newEntry("screen", key);
     expect(e.events.map(ev => ev.name)).toEqual(["初期表示"]);
-    expect(Object.keys(e.events[0].cells!)).toEqual(["err"]);
-    expect(Object.keys(newEntry("batch", key).events[0].cells!)).toEqual(["err"]);
+    expect(Object.keys(e.events[0].cells!)).toEqual(["main", "err"]);
+    expect(Object.keys(newEntry("batch", key).events[0].cells!)).toEqual(["main", "err"]);
     expect(newItem("check", key).layer).toBe("front");
     expect(newItem("check", key, "batch").layer).toBe("be");
   });
@@ -52,6 +52,27 @@ describe("チケットの切り分け", () => {
     /* チェック・ロジックのチケットには「ロジック：〇〇」を書かない。エラーハンドリングありだけ添える */
     expect(contentOf(tks[2])).toEqual([]);
     expect(contentOf(tks[0])).toEqual(["エラーハンドリング：あり（拡張子が.pdfでない）。エラーハンドリングのチケットで扱う"]);
+  });
+  it("チェック・ロジックがないイベントは、イベント名をそのまま名前にして1枚(画面は CLIENT・BFF、それ以外は BE)", () => {
+    const f = base();
+    f.entries[0].events[1].items = [];
+    f.entries[1].events[0].items = [];
+    const tks = ticketsOf(f);
+    expect(tks.map(tk => tk.title).slice(4)).toEqual([
+      "【CLIENT・BFF】書類提出画面 初期表示処理の実装",
+      "【エラーハンドリング】書類提出画面 初期表示",
+      "【BE】審査ステータス更新バッチ 毎日0時に起動処理の実装",
+      "【エラーハンドリング】審査ステータス更新バッチ 毎日0時に起動"]);
+    expect(partOf(tks[4])).toBe("書類提出画面 / 初期表示 / CLIENT・BFF");
+    /* 画面の CLIENT・BFF なら画面作成の部品に入る(画面全体の仕様は最初の CLIENT・BFF のチケットだけ) */
+    const v = docValues(f, tks[4], key);
+    expect(v.blocks.map((b: Values) => b.type)).toEqual(["screen"]);
+    expect(v.blocks[0].only_init).toBe(true);
+    expect(docValues(f, tks[6], key).proc_name).toBe("毎日0時に起動");
+    /* チェック・ロジックを足すと、そちらのチケットに替わる */
+    f.entries[0].events[1].items.push(item("i7", "logic", "一覧を取得", "be", "なし"));
+    expect(ticketsOf(f).map(tk => tk.title)).toContain("【BE】書類提出画面 初期表示の一覧を取得処理の実装");
+    expect(ticketsOf(f).map(tk => tk.title)).not.toContain("【CLIENT・BFF】書類提出画面 初期表示処理の実装");
   });
   it("名前が「〜処理」で終わるなら「処理」を重ねない", () => {
     const f = base();
@@ -147,7 +168,7 @@ describe("前の形からの移し替え", () => {
       items: [{ _k: "a", kind: "check", name: "必須チェック", layer: "bff", err: "あり" }, { _k: "b", kind: "logic", name: "住所を更新", layer: "be", err: "なし" },
         { _k: "c", kind: "logic", name: "メールを送信", layer: "be", err: "なし" }] }] }] });
     const ev = f.entries[0].events[0];
-    expect(ev.cells).toEqual({ err: { on: true, status: "レビュー中" } });
+    expect(ev.cells).toEqual({ main: { on: true, status: "未着手" }, err: { on: true, status: "レビュー中" } });
     expect(ev.items.map(i => [i.layer, i.cell!.status, i.cell!.docId])).toEqual([["front", "進行中", "d1"], ["be", "完了", "d2"], ["be", "完了", undefined]]);
     const docs = [{ id: "d1", v: { feat_ref: { featureId: "f", entry: "e", event: "v", layer: "client" } } }, { id: "d2", v: { feat_ref: { featureId: "f", entry: "e", event: "v", layer: "be" } } }];
     relinkDocs([f], docs);
@@ -161,7 +182,7 @@ describe("前の形からの移し替え", () => {
         { _k: "b", kind: "logic", name: "入力内容の保持", layer: "front", err: "なし", cell: { on: true } },
         { _k: "c", kind: "logic", name: "住所を更新", layer: "be", err: "なし", cell: { on: true, status: "完了", docId: "d2" } }] }] }] });
     const ev = f.entries[0].events[0];
-    expect(ev.cells).toEqual({ err: { on: true, status: "未着手" } });
+    expect(ev.cells).toEqual({ main: { on: true, status: "未着手" }, err: { on: true, status: "未着手" } });
     expect(ev.items.map(i => i.cell)).toEqual([{ on: true, status: "レビュー中", docId: "d1" }, { on: true, status: "レビュー中" }, { on: true, status: "完了", docId: "d2" }]);
   });
   it("チェック・ロジックごとの形から: そのまま引き継ぐ", () => {
@@ -171,6 +192,15 @@ describe("前の形からの移し替え", () => {
     const ev = f.entries[0].events[0];
     expect(ev.items.map(i => [i.layer, i.cell!.status, i.cell!.docId])).toEqual([["front", "進行中", "d1"], ["be", "完了", undefined]]);
     expect("cell" in f.entries[0]).toBe(false);
+  });
+});
+
+describe("前の形からの移し替え(チェック・ロジックがないイベント)", () => {
+  it("イベントの CLIENT・BFF のチケットを、イベント名のチケットとして引き継ぐ", () => {
+    const f = migrateFeature({ id: "f", name: "古い", entries: [{ _k: "e", kind: "screen", name: "住所変更", events: [{ _k: "v", name: "初期表示",
+      cells: { front: { on: true, status: "進行中", docId: "d1" }, err: { on: true } }, items: [] }] }] });
+    expect(f.entries[0].events[0].cells!.main).toEqual({ on: true, status: "進行中", docId: "d1" });
+    expect(ticketsOf(f)[0].title).toBe("【CLIENT・BFF】住所変更画面 初期表示処理の実装");
   });
 });
 

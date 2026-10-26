@@ -6,6 +6,7 @@
            └ チェック / ロジック(CLIENT・BFF か BE か、エラーハンドリングの有無)
    チケット(イベントごと):
      チェック・ロジック1つにつき1枚(CLIENT・BFF も BE も。「〇〇(イベント)の△△処理の実装」)
+     チェック・ロジックがないイベントは、イベント名をそのまま名前にして1枚(画面は CLIENT・BFF、それ以外は BE)
      エラーハンドリング 1枚(エラーハンドリングありのチェック・ロジックをまとめる)
    ほかに、フィーチャー全体のST 1枚 */
 import { COMPONENTS, newBlock } from "./components";
@@ -20,8 +21,10 @@ export type Status = "未着手" | "進行中" | "レビュー中" | "完了";
 export interface FCell { on: boolean; title?: string; status?: Status; docId?: string }
 /* cell はこのチェック・ロジックのチケット(1つにつき1枚) */
 export interface FItem { _k: string; kind: "check" | "logic"; name: string; layer: Layer; err?: "" | "あり" | "なし"; errNote?: string; cell?: FCell }
-/* cells はイベントのチケット(エラーハンドリング)。front は前の形(イベントの CLIENT・BFF)で、読み込み時に移す */
-export interface FEvent { _k: string; name: string; items: FItem[]; cells?: { front?: FCell; err?: FCell } }
+/* cells はイベントのチケット。main はチェック・ロジックがないときのチケット、err はエラーハンドリング。
+   front は前の形(イベントの CLIENT・BFF)で、読み込み時に移す */
+export interface EventCells { main?: FCell; front?: FCell; err?: FCell }
+export interface FEvent { _k: string; name: string; items: FItem[]; cells?: EventCells }
 export interface FEntry { _k: string; kind: EntryKind; name: string; events: FEvent[] }
 /* st はフィーチャー全体のSTチケット(切り分けの最後に1枚) */
 export interface Feature { id: string; name: string; goal?: string; entries: FEntry[]; st?: FCell; createdAt: number; updatedAt: number }
@@ -45,8 +48,8 @@ const screenBase = (name: string) => name.replace(/\s*画面$/, "");
 export const entryLabel = (e: FEntry) => (e.kind === "screen" ? (screenBase(t(e.name)) || MISSING) + "画面" : t(e.name) || MISSING);
 
 export const newCell = (): FCell => ({ on: true, status: "未着手" });
-/* イベントには、エラーハンドリングのチケットを付ける */
-export const eventCells = (_kind: EntryKind): { front?: FCell; err?: FCell } => ({ err: newCell() });
+/* イベントには、チェック・ロジックがないときのチケットと、エラーハンドリングのチケットを付ける */
+export const eventCells = (_kind: EntryKind): EventCells => ({ main: newCell(), err: newCell() });
 export const newEvent = (kind: EntryKind, name: string, key: () => string): FEvent => ({ _k: key(), name, items: [], cells: eventCells(kind) });
 /* 画面・処理を足すときは、イベントも1つ足す(画面は「初期表示」) */
 export const newEntry = (kind: EntryKind, key: () => string): FEntry => ({ _k: key(), kind, name: "", events: [newEvent(kind, ENTRY_KINDS[kind].first, key)] });
@@ -54,17 +57,19 @@ export const newEntry = (kind: EntryKind, key: () => string): FEntry => ({ _k: k
 export const newItem = (kind: FItem["kind"], key: () => string, entry: EntryKind = "screen"): FItem =>
   ({ _k: key(), kind, name: "", layer: kind === "check" && entry === "screen" ? "front" : "be", err: "", cell: newCell() });
 
-/* チケットの一覧。kind: item はチェック・ロジック1つ、err はイベントのエラーハンドリング */
+/* チケットの一覧。kind: item はチェック・ロジック1つ、event はチェック・ロジックがないイベント、err はイベントのエラーハンドリング */
 export interface FTicket {
-  kind: "item" | "err"; entry: FEntry; event: FEvent; item?: FItem; items: FItem[];
+  kind: "item" | "event" | "err"; entry: FEntry; event: FEvent; item?: FItem; items: FItem[];
   lname: string; cell: FCell; title: string;
   path: (string | number)[];   /* フィーチャーの中の、このチケット(cell)の位置 */
 }
 /* 画面以外のチェック・ロジックは BE */
-export const layerOf = (e: FEntry, it: FItem): Layer => (e.kind === "screen" ? it.layer : "be");
+export const layerOf = (e: FEntry, it?: FItem): Layer => (e.kind !== "screen" ? "be" : it ? it.layer : "front");
 /* 「【BE】住所変更画面 初期表示の住所取得処理の実装」。名前が「〜処理」で終わるなら重ねない */
 export function defaultTitle(e: FEntry, ev: FEvent, k: FTicket["kind"], it?: FItem) {
   if (k === "err") return "【" + ERR + "】" + entryLabel(e) + " " + (t(ev.name) || MISSING);
+  /* チェック・ロジックがないときは、イベント名をそのまま名前にする(「初期表示処理の実装」) */
+  if (k === "event") return "【" + LAYERS[layerOf(e)] + "】" + entryLabel(e) + " " + (t(ev.name) || MISSING).replace(/処理$/, "") + "処理の実装";
   const name = (t(it && it.name) || MISSING).replace(/処理$/, "");
   return "【" + LAYERS[layerOf(e, it!)] + "】" + entryLabel(e) + " " + (t(ev.name) || MISSING) + "の" + name + "処理の実装";
 }
@@ -77,6 +82,10 @@ export function ticketsOf(f: Feature): FTicket[] {
         out.push({ kind: "item", entry: e, event: ev, item: it, items: [it], lname: LAYERS[layerOf(e, it)], cell: it.cell,
           title: t(it.cell.title) || defaultTitle(e, ev, "item", it), path: at("items", n, "cell") });
     });
+    const main = ev.cells && ev.cells.main;
+    if (!ev.items.length && main && main.on)
+      out.push({ kind: "event", entry: e, event: ev, items: [], lname: LAYERS[layerOf(e)], cell: main,
+        title: t(main.title) || defaultTitle(e, ev, "event"), path: at("cells", "main") });
     const err = ev.cells && ev.cells.err;
     if (err && err.on)
       out.push({ kind: "err", entry: e, event: ev, items: ev.items.filter(it => it.err === "あり"), lname: ERR, cell: err,
@@ -99,7 +108,7 @@ export const stRef = (f: Feature): FeatRef => ({ featureId: f.id, entry: "", eve
 export const newStCell = newCell;
 /* フィーチャーの中のチケットの枠をすべて(外したものも含む)。受け渡しでチケット本文のつながりを辿るときに使う */
 export const allCells = (f: Feature): FCell[] => f.entries.flatMap(e => e.events.flatMap(ev =>
-  [ev.cells && ev.cells.front, ev.cells && ev.cells.err, ...ev.items.map(it => it.cell)].filter((c): c is FCell => !!c))).concat(f.st ? [f.st] : []);
+  [ev.cells && ev.cells.main, ev.cells && ev.cells.front, ev.cells && ev.cells.err, ...ev.items.map(it => it.cell)].filter((c): c is FCell => !!c))).concat(f.st ? [f.st] : []);
 /* 実施状況を数えるチケット(開発のチケットと、フィーチャー全体のST) */
 export const cellsOf = (f: Feature): FCell[] => ticketsOf(f).map(tk => tk.cell).concat(f.st && f.st.on ? [f.st] : []);
 
@@ -182,9 +191,9 @@ export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
   }
   const base = { _impl: 1, title: tk.title, feat_title: tk.title, story_goal: t(f.goal), feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk) };
   /* 画面の CLIENT・BFF は画面作成の部品に入れる。画面全体の仕様は画面の最初の CLIENT・BFF のチケットで書き、ほかでは任意にする */
-  if (tk.kind === "item" && tk.entry.kind === "screen" && tk.item!.layer === "front") {
-    const firstFront = tk.entry.events.flatMap(ev => ev.items).find(it => it.layer === "front" && it.cell && it.cell.on);
-    const first = firstFront === tk.item;
+  if (tk.kind !== "err" && tk.entry.kind === "screen" && tk.lname === FRONT) {
+    const firstFront = ticketsOf(f).find(x => x.entry === tk.entry && x.kind !== "err" && x.lname === FRONT);
+    const first = !!firstFront && firstFront.cell === tk.cell;
     const init = t(tk.event.name) === ENTRY_KINDS.screen.first;
     return { ...base, proc_name: "", blocks: [{ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)),
       ...(init ? { init: steps, events: [], only_init: true } : { only_events: !first, events: [{ _k: key(), name: t(tk.event.name), trig: trigOf(t(tk.event.name)), steps }] }) }] };
@@ -304,7 +313,8 @@ export function migrateFeature(raw: unknown): Feature {
         return { _k: it._k || rnd(), kind: it.kind === "check" ? "check" : "logic", name: t(it.name), layer,
           err: it.err === "あり" || it.err === "なし" ? it.err : "", errNote: t(it.errNote), cell };
       });
-      const cells = { err: cellOf(oc.err) };
+      /* チェック・ロジックがないイベントは、前のイベントの CLIENT・BFF(または BE)のチケットを引き継ぐ */
+      const cells = { main: cellOf(oc.main || (items.length ? undefined : kind === "screen" ? oFront : oc.be)), err: cellOf(oc.err) };
       return { _k: ev._k || rnd(), name: t(ev.name), items, cells };
     });
     return { _k: e._k || rnd(), kind, name: t(e.name), events };

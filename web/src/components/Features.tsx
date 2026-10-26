@@ -333,7 +333,7 @@ function SplitEditor({ f }: { f: Feature }) {
   };
   const restore = (path: Path, cell: FCell | undefined) => setF(path, { ...(cell || newCell()), on: true }, false);
   return <>
-    <p className="hint">チェック・ロジック1つにつき1枚（「〇〇の△△処理の実装」）、{ERR}はイベントに1枚、チケットにします。カード1枚が1チケットです。ほかのチケットで扱うものは × で外せます。</p>
+    <p className="hint">チェック・ロジック1つにつき1枚（「〇〇の△△処理の実装」。チェック・ロジックがないイベントは「〇〇処理の実装」）、{ERR}はイベントに1枚、チケットにします。カード1枚が1チケットです。ほかのチケットで扱うものは × で外せます。</p>
     <div className="status-sum">
       <span>チケット{cells.length}件</span>
       {STATUSES.map(s => <span key={s} className={"st-pill st-" + STATUSES.indexOf(s)}>{s} {c[s]}</span>)}
@@ -347,6 +347,7 @@ function SplitEditor({ f }: { f: Feature }) {
           const mine = tks.filter(x => x.event === ev);
           const at = (...p: (string | number)[]): Path => ["entries", i, "events", j, ...p];
           const offs: { label: string; path: Path; cell?: FCell }[] = [];
+          if (!ev.items.length && !(ev.cells && ev.cells.main && ev.cells.main.on)) offs.push({ label: LAYERS[layerOf(e)] + "：" + (ev.name.trim() || "イベント"), path: at("cells", "main"), cell: ev.cells && ev.cells.main });
           ev.items.forEach((it, n) => { if (!(it.cell && it.cell.on)) offs.push({ label: LAYERS[layerOf(e, it)] + "：" + (it.name.trim() || ITEM_KINDS[it.kind]), path: at("items", n, "cell"), cell: it.cell }); });
           if (!(ev.cells && ev.cells.err && ev.cells.err.on)) offs.push({ label: ERR, path: at("cells", "err"), cell: ev.cells && ev.cells.err });
           return (
@@ -404,7 +405,7 @@ function Cell({ tk, docMissing }: { f: Feature; tk: FTicket; docMissing: (id: st
   const { cell, path } = tk;
   const m = cell.docId ? docMissing(cell.docId) : null;
   const content = contentOf(tk);
-  const name = tk.kind === "err" ? ERR : tk.lname + "：" + (tk.item!.name.trim() || ITEM_KINDS[tk.item!.kind]);
+  const name = tk.kind === "err" ? ERR : tk.kind === "event" ? tk.lname + "：" + (tk.event.name.trim() || "イベント") : tk.lname + "：" + (tk.item!.name.trim() || ITEM_KINDS[tk.item!.kind]);
   return (
     <div className={"cell st-b" + STATUSES.indexOf(cell.status || "未着手")}>
       <div className="cell-head">
