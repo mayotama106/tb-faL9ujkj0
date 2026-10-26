@@ -8,6 +8,7 @@ import { defsOf, useStore, type Doc } from "../state/store";
 import { copyText, downloadMd, titleOf } from "../utils";
 import { CallPart } from "./CallParts";
 import { FeaturePick } from "./FeaturePick";
+import { exportPack } from "./Share";
 import { Chips, EtcField, Field } from "./Fields";
 import { ImplPart } from "./ImplParts";
 import { StPart } from "./StParts";
@@ -109,6 +110,7 @@ function Final({ doc, g, parts, ticket, missingOf }: { doc: Doc; g: Genre; parts
       <CopyButton className="primary" text={() => ticket.text} done="本文をコピーした">本文をコピー</CopyButton>
       <CopyButton className="plain" text={() => titleOf(doc.v)} done="タイトルをコピーした">タイトルをコピー</CopyButton>
       <button type="button" className="plain" onClick={() => downloadMd(g, doc.v, defs)}>Markdownで書き出す</button>
+      <button type="button" className="plain" title="このチケットを、ほかの人が読み込める形で書き出します" onClick={() => exportPack([doc.id], [], titleOf(doc.v) || g.name)}>ファイルに書き出す</button>
       <span className="spacer" />
       <button type="button" className="plain" onClick={() => duplicateDoc(doc.id)}>複製して新しく作る</button>
       <button type="button" className="plain" onClick={() => clearDoc(doc.id)}>入力を消去</button>

@@ -5,6 +5,7 @@ import { buildTicket } from "../domain/ticket";
 import { createDoc, deleteDoc, duplicateDoc, openDoc } from "../state/actions";
 import { defsOf, genreOf, setUI, useStore } from "../state/store";
 import { downloadMd, stamp, titleOf } from "../utils";
+import { ImportButton, exportPack } from "./Share";
 
 export function Sidebar() {
   const docs = useStore(s => s.data.docs);
@@ -46,6 +47,11 @@ export function Sidebar() {
           <button key={k} type="button" className="chip" aria-pressed={filter === k}
             onClick={() => setUI({ filter: filter === k ? "" : k })}>{GENRES[k].name}</button>
         ))}
+      </div>
+      <div className="side-tools">
+        {shown.length > 0 && <button type="button" className="plain small-btn" title="いま一覧に出ているチケットを、ファイルに書き出します(検索・絞り込みで選べます)"
+          onClick={() => exportPack(shown.map(r => r.d.id), [], shown.length === 1 ? shown[0].title : "チケット")}>{shown.length === docs.length ? "すべて" : "表示中の" + shown.length + "件を"}ファイルに書き出す</button>}
+        <ImportButton />
       </div>
       <ul className="doclist">
         {shown.map(({ d, g, title, missing }) => (

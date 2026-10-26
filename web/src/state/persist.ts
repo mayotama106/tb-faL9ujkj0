@@ -86,10 +86,7 @@ export function loadInitial(): { data: Data; currentId: string | null; collapsed
     try { if (!localStorage.getItem(BACKUP_KEY)) localStorage.setItem(BACKUP_KEY, JSON.stringify(stored)); } catch { /* 何もしない */ }
     docs.forEach(d => { if (OLD_IMPL_GENRES.includes(d.genre)) { d.v = toImpl(d.genre, d.v); d.genre = "impl"; } });
   }
-  docs.forEach(d => {
-    if (GENRES[d.genre] && GENRES[d.genre].impl) d.v = upgradeImpl(d.v);
-    ensureKeys(d.v);
-  });
+  docs.forEach(d => upgradeDoc(d));
   const templates: Record<string, Genre> = {};
   const t = read<Record<string, Genre>>(TPL_KEY) || {};
   Object.keys(t).forEach(k => { if (GENRES[k] && !GENRES[k].impl === !t[k].impl) templates[k] = t[k]; });
@@ -130,4 +127,20 @@ export function importData(text: string) {
   MOVE_KEYS.forEach(k => { if (typeof items[k] === "string") JSON.parse(items[k] as string); });
   localStorage.setItem(KEY + ":before-import", exportData());
   MOVE_KEYS.forEach(k => { if (typeof items[k] === "string") localStorage.setItem(k, items[k] as string); else localStorage.removeItem(k); });
+}
+
+/* チケット1件を今の形にそろえる(旧形式のジャンルの移し替え、実装チケットの更新、行の鍵) */
+function upgradeDoc(d: Doc) {
+  if (OLD_IMPL_GENRES.includes(d.genre)) { d.v = toImpl(d.genre, d.v); d.genre = "impl"; }
+  if (GENRES[d.genre] && GENRES[d.genre].impl) d.v = upgradeImpl(d.v);
+  ensureKeys(d.v);
+}
+/* 読み込んだファイルのチケットを確かめて、今の形にそろえる。チケットでなければ null */
+export function normalizeDoc(raw: unknown): Doc | null {
+  const d = raw as Doc;
+  if (!d || typeof d !== "object" || typeof d.id !== "string" || !known(d.genre) || !d.v || typeof d.v !== "object") return null;
+  const now = Date.now();
+  const doc: Doc = { id: d.id, genre: d.genre, v: JSON.parse(JSON.stringify(d.v)), createdAt: Number(d.createdAt) || now, updatedAt: Number(d.updatedAt) || now };
+  upgradeDoc(doc);
+  return doc;
 }

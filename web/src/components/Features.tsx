@@ -15,6 +15,7 @@ import { defsOf, genreOf, getAt, getState, newId, setAt, setUI, toast, update, u
 import { stamp } from "../utils";
 import { AutoText, Kids, focusLater } from "./Fields";
 import { SortableList, move } from "./Sortable";
+import { ImportButton, exportPack } from "./Share";
 import { CopyButton } from "./Wizard";
 
 type Path = (string | number)[];
@@ -124,7 +125,11 @@ export function FeatureSidebar() {
         <h2>切り分け</h2>
         <button type="button" className="primary small" onClick={createFeature}>＋ 新しく作る</button>
       </div>
-      {features.length > 0 && <button type="button" className="plain small-btn" onClick={() => exportExcel(features, "チケット一覧")}>すべてExcelに書き出す</button>}
+      <div className="side-tools">
+        {features.length > 0 && <button type="button" className="plain small-btn" onClick={() => exportExcel(features, "チケット一覧")}>すべてExcelに書き出す</button>}
+        {features.length > 0 && <button type="button" className="plain small-btn" title="チケット本文もいっしょに書き出します" onClick={() => exportPack([], features.map(f => f.id), "切り分け")}>すべてファイルに書き出す</button>}
+        <ImportButton />
+      </div>
       <ul className="doclist">
         {rows.map(({ f, n, done, issues }) => (
           <li key={f.id} className={f.id === currentId ? "cur" : undefined}>
@@ -455,6 +460,7 @@ export function FeaturePreview({ f }: { f: Feature }) {
       <div className="actions">
         <button type="button" className="primary" onClick={() => exportExcel([f], f.name.trim() || "チケット一覧")}>Excelに書き出す</button>
         <CopyButton className="plain" text={() => r.text} done="コピーした">文字でコピー</CopyButton>
+        <button type="button" className="plain" title="チケット本文もいっしょに書き出します。読み込むと、ほかの人も同じ切り分けを使えます" onClick={() => exportPack([], [f.id], f.name.trim() || "切り分け")}>ファイルに書き出す</button>
       </div>
       <p className="note">Excelの列: {EXCEL_HEADER.join(" / ")}。1チケット1行。</p>
     </section>
