@@ -57,7 +57,7 @@ function randomValues(genre: string, r: () => number): Values {
 
 describe("buildTicket は旧版と同じく未記入を数える", () => {
   /* 実装チケットとSTチケットは旧版にないので、impl.test.ts と st.test.ts で確かめる */
-  for (const genre of Object.keys(GENRES).filter(k => !GENRES[k].impl && !GENRES[k].st)) {
+  for (const genre of Object.keys(GENRES).filter(k => !GENRES[k].impl && !GENRES[k].st && !GENRES[k].call)) {
     it(genre, () => {
       const r = rng(genre.length * 7919);
       expect(buildTicket(GENRES[genre], {}).missing).toBe(legacy({ genre, v: {} }).missing);

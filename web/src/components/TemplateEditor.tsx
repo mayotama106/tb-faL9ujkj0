@@ -114,6 +114,11 @@ function GenreEditor({ genre }: { genre: string }) {
           {([["overview", "実施概要"], ["content", "内容"], ["schedule", "スケジュール"], ["env", "実施環境"], ["steps", "実施手順"], ["ac", "受け入れ条件"]] as const)
             .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
           <p className="hint">実施手順の部品と、部品ごとの受け入れ条件の文言は、上の「部品」から選んで編集します。</p>
+        </> : g.call ? <>
+          {([["feature", "対象のフィーチャー"], ["story", "ストーリー"], ["callFlow", "処理フロー"], ["ac", "受け入れ条件"], ["func", "機能要件"],
+            ["callErr", "異常時の挙動"], ["nonfunc", "非機能要件"], ["other", "その他"], ["callDone", "完了の確認方法"], ["callSpec", "呼び出し先API仕様"]] as const)
+            .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
+          <p className="hint">API呼び出しチケットの問いと文の形は、観点表に沿って決まっています。ここでは見出しを変えられます。</p>
         </> : g.impl ? <>
           {([["feature", "対象のフィーチャー"], ["story", "ストーリー"], ["storyRefs", "ストーリーの参照"], ["scope", "スコープ"], ["scopeIn", "スコープ内"], ["scopeOut", "スコープ外"], ["flowSuffix", "処理の見出しの末尾(〇〇処理)"], ["flowTitle", "処理の流れ"], ["ac", "受け入れ条件"],
             ["okCase", "受け入れ条件の正常時の書き方"], ["notes", "制約事項・技術的補足"], ["branch", "ブランチ"],
@@ -138,7 +143,7 @@ function GenreEditor({ genre }: { genre: string }) {
         {(g.st ? [] as const : g.impl ? [["deps", "依存関係"]] as const : [["deps", "依存関係・環境"], ["refs", "参考情報"]] as const)
           .map(([k, l]) => <EdField key={k} label={"見出し: " + l} value={h[k]} onChange={setHead(k)} />)}
       </section>
-      {g.impl || g.st ? null : g.sections ? g.sections.map((sec, i) => (
+      {g.impl || g.st || g.call ? null : g.sections ? g.sections.map((sec, i) => (
         <section className="card" key={sec.key}><h2>問い: {sec.title}</h2><EdList genre={genre} path={["sections", i, "nodes"]} /></section>
       )) : <>
         <section className="card"><h2>問い: {h.func}</h2><EdList genre={genre} path={["func"]} /></section>

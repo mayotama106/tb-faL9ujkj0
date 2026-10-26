@@ -30,6 +30,8 @@ export interface Heads {
   flowSuffix: string; flowTitle: string; notes: string; branch: string;
   call: string; impact: string; okCase: string;
   scope: string; scopeIn: string; scopeOut: string; feature: string; storyRefs: string;
+  /* API呼び出しチケットで使う見出し */
+  callFlow: string; callErr: string; callDone: string; callSpec: string;
   /* STチケットで使う見出し */
   overview: string; content: string; schedule: string; env: string; steps: string;
 }
@@ -47,6 +49,7 @@ export interface Genre {
   sections?: Section[];
   heads?: Partial<Heads>;
   impl?: boolean;   /* 実装チケット。部品を組み合わせて作り、観点表(func など)を持たない */
+  call?: boolean;   /* API呼び出しチケット。外部・他システムのAPIを呼び出す処理。観点表に沿って問う */
   st?: boolean;     /* STチケット。実施手順を部品で組み立て、受け入れ条件は手順から作る */
 }
 
@@ -67,6 +70,10 @@ export const GENRES: Record<string, Genre> = {
     name: "実装チケット",
     impl: true,
     heads: { deps: "依存関係" }
+  },
+  call: {
+    name: "API呼び出しチケット",
+    call: true
   },
   st: {
     name: "STチケット",

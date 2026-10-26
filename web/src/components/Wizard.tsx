@@ -6,6 +6,7 @@ import { clearDoc, duplicateDoc, goPart } from "../state/actions";
 import { FINAL, partsOf, type Part } from "../state/parts";
 import { defsOf, useStore, type Doc } from "../state/store";
 import { copyText, downloadMd, titleOf } from "../utils";
+import { CallPart } from "./CallParts";
 import { FeaturePick } from "./FeaturePick";
 import { Chips, EtcField, Field } from "./Fields";
 import { ImplPart } from "./ImplParts";
@@ -54,6 +55,7 @@ function PartBody({ doc, g, part, parts, ticket, missingOf }: {
   const modNote = isMod && <p className="hint">既存改修：変更点だけ記入します。記入のない項目は本文に出ません。</p>;
   if (g.impl && part.key !== FINAL) return <ImplPart g={g} partKey={part.key} />;
   if (g.st && part.key !== FINAL) return <StPart g={g} partKey={part.key} />;
+  if (g.call && part.key !== FINAL) return <CallPart g={g} partKey={part.key} />;
   switch (part.key) {
     case "basic": return <>
       <Field path={["title"]} label="タイトル(Jiraの要約欄に入れる)" />

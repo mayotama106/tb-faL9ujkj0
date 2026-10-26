@@ -380,3 +380,14 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
   .narrow-only { display: inline-block; }
   .local-pop .narrow-only { display: block; }
 }
+
+/* ===== API呼び出しチケット ===== */
+.call-rows { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.call-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; width: 100%; }
+.call-row > textarea { flex: 1 1 160px; min-width: 0; }
+.call-row > .chips { flex: none; }
+.call-errs { display: flex; flex-direction: column; gap: 10px; }
+.call-err { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 10px; background: var(--field); border: 1px solid var(--mist); }
+.call-err .lbl { font-weight: 700; font-size: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.call-biz { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; flex: 1 1 240px; }
+.call-biz textarea { flex: 1 1 auto; min-width: 0; }

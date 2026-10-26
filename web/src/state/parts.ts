@@ -13,6 +13,16 @@ export function partsOf(g: Genre): Part[] {
     { key: "ac", title: h.ac },
     { key: FINAL, title: "仕上げ" }
   ];
+  if (g.call) return [
+    { key: "basic", title: "タイトル・" + h.story },
+    { key: "flow", title: h.callFlow },
+    { key: "func", title: h.func },
+    { key: "nonfunc", title: h.nonfunc + "・" + h.other },
+    { key: "done", title: h.callDone },
+    { key: "spec", title: "呼び出し先API仕様" },
+    { key: "deps", title: h.deps + "・" + h.refs },
+    { key: FINAL, title: "仕上げ" }
+  ];
   if (g.impl) return [
     { key: "basic", title: "タイトル・" + h.story + "・" + h.scope },
     { key: "build", title: "組み立て" },
