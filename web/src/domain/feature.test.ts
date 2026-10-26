@@ -171,13 +171,23 @@ describe("切り分けから作るチケット本文", () => {
     expect(text).not.toContain("正常に処理が完了した場合");
     expect(text).toContain("* 書類提出画面が表示されること");
   });
+  it("初期表示のチケットは、処理を画面の初期表示に入れ、イベントは任意にする", () => {
+    const f = base();
+    f.entries[0].events[1].items[0].layer = "client";
+    const tk = ticketsOf(f).find(x => x.event.name === "初期表示" && x.layer === "client")!;
+    const r = buildTicket(GENRES.impl, docValues(f, tk, key));
+    expect(r.text).toContain("### 初期表示\n\n1. 提出済みの書類を取得");
+    expect(r.text).not.toContain("* イベント");
+    expect(r.text).toContain("* 書類提出画面が表示されること");
+  });
   it("最初のイベント以外の画面のチケットは、画面全体の仕様を任意にし、画面の受け入れ条件を作らない", () => {
     const f = base();
-    const tk = ticketsOf(f).find(x => x.event.name === "初期表示" && x.layer === "client")!;
+    f.entries[0].events.reverse();   /* 初期表示を先に、保存ボタン押下を2つ目に */
+    const tk = ticketsOf(f).find(x => x.event.name === "保存ボタン押下" && x.layer === "client")!;
     const r = buildTicket(GENRES.impl, docValues(f, tk, key));
     expect(r.text).not.toContain("画面ID");
     expect(r.text).not.toContain("画面が表示されること");
-    expect(r.text).toContain("   * 初期表示\n      * きっかけ：画面の表示");
+    expect(r.text).toContain("   * 保存ボタン押下\n      * きっかけ：クリック");
   });
   it("エラーの「どんな場合？」と、きっかけの決め方", () => {
     expect(errWhen({ _k: "i", kind: "check", name: "必須チェック", layer: "be", errNote: "未入力の項目がある" })).toBe("未入力の項目がある場合（必須チェック）");

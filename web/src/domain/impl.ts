@@ -231,7 +231,7 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
   function containerLines(b: Values, def: CompDef): string[] {
     const hf = headOf(def.fields);
     const out = ["", "## " + (hf ? req(b[hf.id]) : def.name) + (def.suffix || "")];
-    const loose = (f: FieldDef) => !!b.only_events && f.id !== "events";
+    const loose = (f: FieldDef) => (!!b.only_events && f.id !== "events") || (!!b.only_init && f.id === "events");
     const spec = def.fields.filter(f => f.kind !== "blocks").flatMap(f => {
       lenient = loose(f);
       const ls = fieldLines(f, b, 0);

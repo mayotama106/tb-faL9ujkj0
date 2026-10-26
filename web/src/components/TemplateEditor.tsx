@@ -78,8 +78,8 @@ export function TemplateEditor() {
         <button type="button" className="chip" aria-pressed={sel === genre} onClick={() => setUI({ editGenre: genre })}>本文の構成</button>
       </div>}
       {groups.map(gr => (
-        <div key={gr} className="pal-row" role="group" aria-label={"部品: " + gr}>
-          <span className="pal-g">部品: {gr}</span>
+        <div key={gr} className="pal-row" role="group" aria-label={"部品：" + (gr === "入れ物" ? "大枠" : gr)}>
+          <span className="pal-g">部品：{gr === "入れ物" ? "大枠" : gr}</span>
           {Object.values(defs).filter(d => d.group === gr).map(d => (
             <button key={d.type} type="button" className="chip" aria-pressed={sel === "comp:" + d.type}
               onClick={() => setUI({ editGenre: "comp:" + d.type })}>{d.name}</button>
@@ -243,7 +243,7 @@ function CompEditor({ type }: { type: string }) {
   if (!def) return null;
   return <>
     <section className="card">
-      <h2>部品: {def.name}{edited && <span className="tag">編集済み</span>}</h2>
+      <h2>部品：{def.name}{edited && <span className="tag">編集済み</span>}</h2>
       <p className="hint">ここでの変更は、このブラウザ内にだけ保存され、すぐに全チケットへ反映されます。入力済みの内容は消えません（消した欄の値は本文に出なくなります）。欄は ⋮⋮ を持って並べ替えられます。</p>
       <EdField label="部品の名前(追加ボタンの表記)" value={def.name} onChange={val => editComp(type, d => { d.name = val; }, "name")} />
       {def.container && <EdField label="本文の節の見出しの末尾(〇〇API など)" value={def.suffix || ""}

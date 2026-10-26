@@ -91,16 +91,16 @@ export const newStCell = (): FCell => ({ on: true, status: "未着手" });
 export const cellsOf = (f: Feature): FCell[] => ticketsOf(f).map(tk => tk.cell).concat(f.st && f.st.on ? [f.st] : []);
 
 /* チケット本文から選ぶ、切り分けのチケット。impl は開発のチケット、st はフィーチャー全体のST */
-export interface PickOption { f: Feature; ref: FeatRef; label: string; name: string; part: string; cell: FCell }
+export interface PickOption { f: Feature; ref: FeatRef; label: string; name: string; part: string; title: string; cell: FCell }
 export function pickOptions(features: Feature[], kind: "impl" | "st"): PickOption[] {
   return features.flatMap(f => kind === "st"
-    ? (f.st && f.st.on ? [{ f, ref: stRef(f), label: (t(f.name) || MISSING) + " › ST", name: t(f.name), part: ST_PART, cell: f.st }] : [])
-    : ticketsOf(f).map(tk => ({ f, ref: refOf(f, tk), label: (t(f.name) || MISSING) + " › " + partOf(tk), name: t(f.name), part: partOf(tk), cell: tk.cell })));
+    ? (f.st && f.st.on ? [{ f, ref: stRef(f), label: (t(f.name) || MISSING) + " › ST", name: t(f.name), part: ST_PART, title: t(f.st.title) || stTitle(f), cell: f.st }] : [])
+    : ticketsOf(f).map(tk => ({ f, ref: refOf(f, tk), label: (t(f.name) || MISSING) + " › " + partOf(tk), name: t(f.name), part: partOf(tk), title: tk.title, cell: tk.cell })));
 }
 /* STチケットの入力値。内容には、フィーチャーの画面・処理とイベントを並べておく */
 export function stValues(f: Feature): Values {
   return {
-    title: t(f.st && f.st.title) || stTitle(f), feat_name: t(f.name), feat_part: ST_PART, feat_ref: stRef(f),
+    title: t(f.st && f.st.title) || stTitle(f), feat_title: t(f.st && f.st.title) || stTitle(f), feat_name: t(f.name), feat_part: ST_PART, feat_ref: stRef(f),
     content: f.entries.map(e => entryLabel(e) + "（" + e.events.map(ev => t(ev.name) || MISSING).join("、") + "）").join("\n")
   };
 }
@@ -166,11 +166,15 @@ export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
   }
   const blocks: Values[] = [];
   /* 画面のチケットは画面作成の部品に入れる。画面全体の仕様は最初のイベント(初期表示)のチケットで書き、ほかのイベントのチケットでは任意にする */
-  if (tk.layer === "client" && tk.entry.kind === "screen")
-    blocks.push({ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)), only_events: tk.entry.events[0] !== tk.event,
-      events: [{ _k: key(), name: t(tk.event.name), trig: trigOf(t(tk.event.name)), steps }] });
+  /* 初期表示のチケットは、処理を画面の「初期表示」に入れ、ほかのイベントは任意にする */
+  if (tk.layer === "client" && tk.entry.kind === "screen") {
+    const first = tk.entry.events[0] === tk.event;
+    const init = t(tk.event.name) === ENTRY_KINDS.screen.first;
+    blocks.push({ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)),
+      ...(init ? { init: steps, events: [], only_init: true } : { only_events: !first, events: [{ _k: key(), name: t(tk.event.name), trig: trigOf(t(tk.event.name)), steps }] }) });
+  }
   return {
-    _impl: 1, title: tk.title, story_goal: t(f.goal),
+    _impl: 1, title: tk.title, feat_title: tk.title, story_goal: t(f.goal),
     feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk),
     scope_in: tk.items.map(it => t(it.name)).filter(Boolean), scope_out: [],
     proc_name: blocks.length || !steps.length ? "" : t(tk.event.name), blocks: blocks.length ? blocks : steps

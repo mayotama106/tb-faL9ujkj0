@@ -373,3 +373,10 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
 .chip.mini { white-space: nowrap; flex: none; }
 .only-events { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 4px 0 8px; }
 .only-events .hint { margin: 0; flex: 1 1 260px; }
+.feat-stale { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; margin: 4px 0 6px; border-radius: 10px; background: #fff8ef; border: 1px solid var(--gold); font-size: 14px; }
+.narrow-only { display: none; }
+@media (max-width: 599px) {
+  .wide-only { display: none !important; }
+  .narrow-only { display: inline-block; }
+  .local-pop .narrow-only { display: block; }
+}

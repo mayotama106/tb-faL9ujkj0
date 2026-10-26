@@ -15,7 +15,7 @@ function save(text: string, name: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-export function LocalMenu() {
+export function LocalMenu({ extra }: { extra?: { label: string; onClick: () => void } }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -46,10 +46,11 @@ export function LocalMenu() {
   return (
     <div className="local-menu" ref={box}>
       <button type="button" className="hbtn" aria-expanded={open} onClick={() => setOpen(!open)} title="ローカルで使う・データの移行">
-        ⇩<span className="lbl"> ローカル版・データ</span>
+        <span className="wide-only">⇩<span className="lbl"> ローカル版・データ</span></span><span className="narrow-only" aria-label="メニュー">⋯</span>
       </button>
       {open && (
         <div className="local-pop" role="menu">
+          {extra && <button type="button" className="plain narrow-only" role="menuitem" onClick={() => { setOpen(false); extra.onClick(); }}>{extra.label}</button>}
           {!isLocal && <>
             <a className="primary small" role="menuitem" href="./ticket-builder.html" download="ticket-builder.html" onClick={() => setOpen(false)}>アプリをダウンロード</a>
             <p className="hint">1つのHTMLファイルです。ダブルクリックでブラウザで開けます（ネット接続なしで動きます）。</p>

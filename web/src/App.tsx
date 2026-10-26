@@ -43,6 +43,7 @@ export function App() {
   const v = doc && doc.genre === previewGenre ? doc.v : EMPTY;
   const defs = defsOf(data);
   const ticket = useMemo(() => (g ? buildTicket(g, v, defs) : null), [g, v, defs]);
+  const toggleTpl = () => setUI(ui => ({ editing: !ui.editing, editGenre: doc ? doc.genre : ui.editGenre }));
 
   return <>
     <header className="top">
@@ -56,11 +57,11 @@ export function App() {
       <span className="spacer" />
       <button type="button" className="hbtn" disabled={!canUndo} onClick={undo} title="元に戻す(Ctrl+Z)" aria-label="元に戻す">↶<span className="lbl"> 元に戻す</span></button>
       <button type="button" className="hbtn" disabled={!canRedo} onClick={redo} title="やり直す(Ctrl+Shift+Z)" aria-label="やり直す">↷<span className="lbl"> やり直す</span></button>
-      {view === "tickets" && <button type="button" className={editing ? "hbtn on" : "hbtn"} aria-pressed={editing}
-        onClick={() => setUI(ui => ({ editing: !ui.editing, editGenre: doc ? doc.genre : ui.editGenre }))}>
+      {/* スマホでは、テンプレートの編集はヘッダーのメニュー(⋯)に入れる */}
+      {view === "tickets" && <button type="button" className={(editing ? "hbtn on" : "hbtn") + " wide-only"} aria-pressed={editing} onClick={toggleTpl}>
         {editing ? "編集を終える" : <>テンプレート<span className="lbl">を編集</span></>}
       </button>}
-      <LocalMenu />
+      <LocalMenu extra={view === "tickets" ? { label: editing ? "テンプレートの編集を終える" : "テンプレートを編集", onClick: toggleTpl } : undefined} />
     </header>
     {view === "features" ? <div className="app">
       <aside className={sidebar ? "sidebar open" : "sidebar"}><FeatureSidebar /></aside>
