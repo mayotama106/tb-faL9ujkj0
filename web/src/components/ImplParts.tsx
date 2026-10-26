@@ -1,6 +1,6 @@
 /* 実装チケットの入力画面。パートは タイトルとストーリー / 組み立て / 受け入れ条件 / 制約事項・技術的補足 */
 import { MOD, NEW, type Genre, type QNode } from "../domain/genres";
-import { collectAc, scopeFromBlocks } from "../domain/impl";
+import { collectAc, isFrontTicket, scopeFromBlocks } from "../domain/impl";
 import { headsOf, type Values } from "../domain/ticket";
 import { defsOf, setValue, useStore } from "../state/store";
 import { BlockList, CodeLists, ErrorEditor } from "./Blocks";
@@ -71,7 +71,7 @@ export function ImplPart({ g, partKey }: { g: Genre; partKey: string }) {
         ) : <p className="hint">組み立てで部品を足すと、ここに受け入れ条件ができます。</p>}
         <div className="node ac-ok">
           <div className="q">{h.okCase}は？</div>
-          <Field path={["ok_status"]} label="HTTPステータス" ph="例: 200" />
+          <Field path={["ok_status"]} label={isFrontTicket(v) ? "HTTPステータス(任意。BFFが値を返す場合)" : "HTTPステータス"} ph="例: 200" />
           <Field path={["ok_body"]} label="返す内容は？(任意)" ph="例: アップロードした書類のID" />
         </div>
         <div className="node">

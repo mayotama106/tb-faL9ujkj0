@@ -171,11 +171,20 @@ export function upgradeImpl(v: Values): Values {
     n = { ...v, scope_in: scopeIn(v) };
     delete n.story_scope;
   }
+  /* 「処理を書く」に「該当しない」と書いた〇〇の場合は、「該当しない」の選択に切り替える */
+  if (JSON.stringify(n).includes("該当")) n = naCases(n);
   /* APIの「項目と型」「必須/任意」の2つの一覧を、「項目」1つにまとめる(postalCode: string（必須）) */
   if (Array.isArray(n.blocks) && n.blocks.some((b: Values) => b && (b.req_need || b.res_need))) {
     n = { ...n, blocks: n.blocks.map((b: Values) => (b && (b.req_need || b.res_need) ? mergeNeeds(b) : b)) };
   }
   return n;
+}
+function naCases<T>(x: T): T {
+  if (Array.isArray(x)) return x.map(naCases) as T;
+  if (!x || typeof x !== "object") return x;
+  const o = x as Values;
+  if (o.mode === "text" && typeof o.text === "string" && /該当(しない|なし)[。．]?$/.test(o.text.trim())) return { ...o, mode: "na" } as T;
+  return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, naCases(v)])) as T;
 }
 function mergeNeeds(b: Values): Values {
   const n: Values = { ...b };

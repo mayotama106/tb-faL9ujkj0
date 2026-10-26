@@ -198,6 +198,12 @@ describe("実装チケット", () => {
       .toEqual(["住所変更API", "メールを送信"]);
   });
 
+  it("「処理を書く」に「該当しない」と書いたものは、読み込み時に「該当しない」の選択にする", () => {
+    const n = upgradeImpl({ scope_in: [], blocks: [{ type: "update", part: { mode: "text", text: "1件だけ更新するため、該当しない" }, none: { mode: "text", text: "エラーを返す" } }] });
+    expect(n.blocks[0].part.mode).toBe("na");
+    expect(n.blocks[0].none.mode).toBe("text");
+  });
+
   it("APIの「項目と型」と「必須/任意」は、読み込み時に「項目」1つにまとめる", () => {
     const n = upgradeImpl({ scope_in: [], blocks: [{ type: "api", req_items: ["postalCode: string", "address2: string"], req_need: ["postalCode: 必須", "address2: 任意", "x: 必須"] }] });
     expect(n.blocks[0].req_items).toEqual(["postalCode: string（必須）", "address2: string（任意）", "x: 必須"]);

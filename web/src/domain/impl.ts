@@ -22,6 +22,7 @@ const headOf = (fields: FieldDef[]) => fields.find(f => f.head);
 const usable = (f: FieldDef, o: Values) => !f.when || o[f.when.id] === f.when.eq;
 /* 対象の部分が BE のチケットは、エラーの表示を決めないので、空なら「表示しない」として扱う */
 export const isBeTicket = (v: Values) => /(^|[/／])\s*BE\s*$/.test(t(v.feat_part));
+export const isFrontTicket = (v: Values) => /(^|[/／])\s*(CLIENT・BFF|CLIENT|BFF)\s*$/.test(t(v.feat_part));
 export const displayOf = (e: ErrVal | undefined, v: Values) => t(e && e.display) || (isBeTicket(v) ? NO_DISPLAY : "");
 
 /* スコープ内の案。組み立てのいちばん外の部品の見出し(入れ物は「〇〇API」など) */
@@ -65,10 +66,13 @@ export function collectAc(defs: Defs, v: Values): AcGroup[] {
     const def = defs[b.type];
     if (!def) return;
     if (def.type === "error") {
-      push(outer, { label: t(b.when) || caseLabel || MISSING, err: b.err || {}, path: [...p, "err"] });
+      /* 見出しが文でなければ(〇〇処理、イベント名)、「〇〇のエラーハンドリングが行われていること」にする */
+      const lead = /こと$/.test(outer) ? outer : outer + "のエラーハンドリングが行われていること";
+      push(lead, { label: t(b.when) || caseLabel || MISSING, err: b.err || {}, path: [...p, "err"] });
       return;
     }
-    const own = t(b.ac) ? [t(b.ac)] : (def.ac || []).map(a => fillAc(a, def, b, MISSING));
+    /* イベントだけを扱う画面(切り分けで初期表示以外のイベントから作ったもの)は、画面の受け入れ条件を作らない */
+    const own = t(b.ac) ? [t(b.ac)] : b.only_events ? [] : (def.ac || []).map(a => fillAc(a, def, b, MISSING));
     const leads = own.length ? own : [((headOf(def.fields) && t(b[headOf(def.fields)!.id]).split("\n")[0]) || MISSING)];
     const withCase = (s: string) => (caseLabel ? caseLabel + "、" + s : s);
     /* 受け入れ条件を持たない部品(API作成)は、中のエラーがあるときだけ見出しを作る */
@@ -124,7 +128,8 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
     return [bullet(d, label)].concat(ls.map(l => bullet(d + 1, l)));
   };
   const req = (s: unknown) => t(s) || miss();
-  const skip = (f: FieldDef) => !!f.optional || sparse;
+  let lenient = false;   /* イベントだけを扱う画面の、画面全体の仕様の欄は任意 */
+  const skip = (f: FieldDef) => !!f.optional || sparse || lenient;
 
   /* 欄1つ分(処理の流れ・仕様の中)。エラーは受け入れ条件にだけ出す */
   function fieldLines(f: FieldDef, o: Values, d: number): string[] {
@@ -168,6 +173,10 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
         if (!rows.length) return empty();
         const rh = headOf(f.fields || []);
         const rd = f.bare ? d : d + 1;   /* bare なら表記の行を出さず、行をそのまま並べる */
+        /* 行が1つで、その名前が部品の見出しと同じなら、名前の行を重ねて出さない(チェックが1つのチェック群) */
+        const ph = headOf(Object.values(defs).find(x => x.type === o.type)?.fields || []);
+        if (f.bare && rh && ph && rows.length === 1 && t(rows[0][rh.id]) && t(rows[0][rh.id]) === t(o[ph.id]))
+          return (f.fields || []).filter(c => c !== rh).flatMap(c => fieldLines(c, rows[0], rd));
         const lines = rows.flatMap(r => [
           ...headed(rd, (rh && t(r[rh.id])) || miss()),
           ...(f.fields || []).filter(c => c !== rh).flatMap(c => fieldLines(c, r, rd + 1))
@@ -222,11 +231,17 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
   function containerLines(b: Values, def: CompDef): string[] {
     const hf = headOf(def.fields);
     const out = ["", "## " + (hf ? req(b[hf.id]) : def.name) + (def.suffix || "")];
-    const spec = def.fields.filter(f => f.kind !== "blocks").flatMap(f => fieldLines(f, b, 0));
+    const loose = (f: FieldDef) => !!b.only_events && f.id !== "events";
+    const spec = def.fields.filter(f => f.kind !== "blocks").flatMap(f => {
+      lenient = loose(f);
+      const ls = fieldLines(f, b, 0);
+      lenient = false;
+      return ls;
+    });
     if (spec.length) out.push("### 仕様", "", ...spec);
     def.fields.filter(f => f.kind === "blocks" && usable(f, b)).forEach(f => {
       const items = arr(b[f.id]);
-      if (!items.length && skip(f)) return;
+      if (!items.length && (skip(f) || loose(f))) return;
       out.push("", "### " + f.label, "", ...(items.length ? blockLines(items, 0, true) : ["1. " + miss()]));
     });
     return out;
@@ -281,10 +296,13 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
       out.push(bullet(0, gr.lead));
       gr.cases.forEach(c => out.push(bullet(1, c.label), ...(c.err ? errLines(c.err, 2) : [])));
     });
-    out.push(bullet(0, h.okCase), bullet(1, "HTTPステータス：" + req(v.ok_status)));
-    const body = linesOf(v.ok_body);
-    if (body.length === 1) out.push(bullet(1, "返す内容：" + body[0]));
-    else if (body.length) out.push(bullet(1, "返す内容"), ...body.map(l => bullet(2, l)));
+    /* 画面側(CLIENT・BFF)のチケットは、正常時のHTTPステータスを任意にする(書いたときだけ出す) */
+    if (!isFrontTicket(v) || t(v.ok_status) || t(v.ok_body)) {
+      out.push(bullet(0, h.okCase), bullet(1, "HTTPステータス：" + req(v.ok_status)));
+      const body = linesOf(v.ok_body);
+      if (body.length === 1) out.push(bullet(1, "返す内容：" + body[0]));
+      else if (body.length) out.push(bullet(1, "返す内容"), ...body.map(l => bullet(2, l)));
+    }
     listItems(v.ac_extra).forEach(x => out.push(...headed(0, x)));
     return out;
   });

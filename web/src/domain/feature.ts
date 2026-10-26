@@ -151,7 +151,7 @@ export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
   let checks: Values | null = null;
   tk.items.forEach(it => {
     if (tk.layer === "err") {
-      steps.push({ ...newBlock(COMPONENTS.error, key), when: (t(it.name) || MISSING) + (t(it.errNote) ? "（" + t(it.errNote) + "）" : "") + "の場合", err: {} });
+      steps.push({ ...newBlock(COMPONENTS.error, key), when: errWhen(it), err: {} });
     } else if (it.kind === "check") {
       if (!checks) { checks = { ...newBlock(COMPONENTS.check, key), name: "", items: [] }; steps.push(checks); }
       (checks.items as Values[]).push({ _k: key(), name: t(it.name), detail: "", err: {} });
@@ -165,14 +165,31 @@ export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
     c.name = items.length === 1 ? items[0].name : (t(tk.event.name) || MISSING) + "時のチェック";
   }
   const blocks: Values[] = [];
+  /* 画面のチケットは画面作成の部品に入れる。画面全体の仕様は最初のイベント(初期表示)のチケットで書き、ほかのイベントのチケットでは任意にする */
   if (tk.layer === "client" && tk.entry.kind === "screen")
-    blocks.push({ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)), events: [{ _k: key(), name: t(tk.event.name), steps }] });
+    blocks.push({ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)), only_events: tk.entry.events[0] !== tk.event,
+      events: [{ _k: key(), name: t(tk.event.name), trig: trigOf(t(tk.event.name)), steps }] });
   return {
     _impl: 1, title: tk.title, story_goal: t(f.goal),
     feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk),
     scope_in: tk.items.map(it => t(it.name)).filter(Boolean), scope_out: [],
     proc_name: blocks.length || !steps.length ? "" : t(tk.event.name), blocks: blocks.length ? blocks : steps
   };
+}
+
+/* エラーハンドリングのチケットの「どんな場合？」。理由があれば「理由場合（チェック名）」、なければ「チェック名でエラーになる場合」 */
+export function errWhen(it: FItem): string {
+  const name = t(it.name) || MISSING, note = t(it.errNote).replace(/[。．]$/, "");
+  if (!note) return name + "でエラーになる場合";
+  return (/(場合|とき|時)$/.test(note) ? note : note + "場合") + "（" + name + "）";
+}
+/* イベントのきっかけ。イベント名から決める(〇〇ボタン押下 → クリック、初期表示 → 画面の表示) */
+export function trigOf(ev: string): string {
+  if (/押下|クリック|タップ/.test(ev)) return "クリック";
+  if (/初期表示|表示/.test(ev)) return "画面の表示";
+  if (/入力/.test(ev)) return "入力";
+  if (/選択/.test(ev)) return "選択";
+  return ev;
 }
 
 /* ロジックの名前から部品を選ぶ(住所を更新 → 更新 など)。当てはまらなければ処理実行 */

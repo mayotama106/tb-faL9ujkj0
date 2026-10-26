@@ -106,6 +106,10 @@ function BlockView({ path, index, handle, numbered }: { path: Path; index: numbe
       </div>
       {!closed && <Kids>
         {def.hint && <p className="hint">{def.hint}</p>}
+        {b.only_events && <div className="only-events">
+          <p className="hint">このチケットはイベントだけを扱います。画面全体の仕様（画面ID・画面の要素・初期表示など）は任意で、受け入れ条件にも出しません。</p>
+          <button type="button" className="plain small-btn" onClick={() => setValue([...me, "only_events"], false, false)}>画面全体の仕様も書く</button>
+        </div>}
         <FieldsView fields={def.fields} path={me} obj={b} />
       </Kids>}
     </div>

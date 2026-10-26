@@ -1,6 +1,6 @@
 /* チケットの切り分け: 起点 → イベント → 開発領域ごとのチケット、実施状況、Excelの表 */
 import { describe, expect, it } from "vitest";
-import { buildFeature, cellsOf, compOf, newStCell, stValues, defaultCells, entryLabel, newItem, docValues, excelRows, EXCEL_HEADER, issuesOf, migrateFeature, newEntry, statusCount, ticketsOf, type Feature } from "./feature";
+import { buildFeature, cellsOf, compOf, errWhen, trigOf, newStCell, stValues, defaultCells, entryLabel, newItem, docValues, excelRows, EXCEL_HEADER, issuesOf, migrateFeature, newEntry, statusCount, ticketsOf, type Feature } from "./feature";
 import { GENRES } from "./genres";
 import { buildTicket, type Values } from "./ticket";
 import { buildXlsx, colName } from "./xlsx";
@@ -73,7 +73,9 @@ describe("チケットの切り分け", () => {
     expect(front).toContain("## 書類提出画面");
     expect(front).toContain("ファイル形式チェック");
     const err = buildTicket(GENRES.impl, docValues(f, tks[2], key)).text;
-    expect(err).toContain("ファイル形式チェック（拡張子が.pdfでない）の場合");
+    expect(err).toContain("1. 拡張子が.pdfでない場合（ファイル形式チェック）はエラーを返却\n2. 書類の情報を登録でエラーになる場合はエラーを返却");
+    /* エラーハンドリングの受け入れ条件の見出しは文にする */
+    expect(err).toContain("* 保存ボタン押下処理のエラーハンドリングが行われていること\n   * 拡張子が.pdfでない場合（ファイル形式チェック）");
     /* チェックが1つならその名前がチェック群の名前になり、ロジックは名前から部品を選ぶ(登録 → 登録の部品) */
     const be = docValues(f, tks[1], key);
     expect(be.blocks.map((b: Values) => b.type)).toEqual(["create"]);
@@ -157,5 +159,30 @@ describe("フィーチャー全体のST", () => {
     expect(buildTicket(GENRES.bug, {}).text).toMatch(/^## 概要/);
     expect(buildTicket(GENRES.bug, { feat_name: "住所変更", feat_part: "住所変更画面 / 変更ボタン押下 / BE" }).text)
       .toMatch(/^## 対象のフィーチャー\n\n\* フィーチャー：住所変更\n\* 対象：住所変更画面 \/ 変更ボタン押下 \/ BE\n\n## 概要/);
+  });
+});
+
+describe("切り分けから作るチケット本文", () => {
+  it("画面のチケット: きっかけはイベント名から入り、チェック1つなら名前を重ねない。正常時のHTTPステータスは任意", () => {
+    const f = base();
+    const v = docValues(f, ticketsOf(f)[0], key);   /* 保存ボタン押下(最初のイベント)の CLIENT・BFF */
+    const text = buildTicket(GENRES.impl, v).text;
+    expect(text).toContain("      * きっかけ：クリック\n      * 処理\n         1. ファイル形式チェック\n\n");
+    expect(text).not.toContain("正常に処理が完了した場合");
+    expect(text).toContain("* 書類提出画面が表示されること");
+  });
+  it("最初のイベント以外の画面のチケットは、画面全体の仕様を任意にし、画面の受け入れ条件を作らない", () => {
+    const f = base();
+    const tk = ticketsOf(f).find(x => x.event.name === "初期表示" && x.layer === "client")!;
+    const r = buildTicket(GENRES.impl, docValues(f, tk, key));
+    expect(r.text).not.toContain("画面ID");
+    expect(r.text).not.toContain("画面が表示されること");
+    expect(r.text).toContain("   * 初期表示\n      * きっかけ：画面の表示");
+  });
+  it("エラーの「どんな場合？」と、きっかけの決め方", () => {
+    expect(errWhen({ _k: "i", kind: "check", name: "必須チェック", layer: "be", errNote: "未入力の項目がある" })).toBe("未入力の項目がある場合（必須チェック）");
+    expect(errWhen({ _k: "i", kind: "check", name: "必須チェック", layer: "be", errNote: "締め処理中のとき" })).toBe("締め処理中のとき（必須チェック）");
+    expect(errWhen({ _k: "i", kind: "logic", name: "住所を更新", layer: "be" })).toBe("住所を更新でエラーになる場合");
+    expect(["変更ボタン押下", "初期表示", "郵便番号の入力", "毎日2時"].map(trigOf)).toEqual(["クリック", "画面の表示", "入力", "毎日2時"]);
   });
 });
