@@ -24,7 +24,7 @@ export function partsOf(g: Genre): Part[] {
     { key: FINAL, title: "仕上げ" }
   ];
   if (g.impl) return [
-    { key: "basic", title: "タイトル・" + h.story + "・" + h.scope },
+    { key: "basic", title: "タイトル・" + h.story },
     { key: "build", title: "組み立て" },
     { key: "ac", title: h.ac },
     { key: "notes", title: h.notes },

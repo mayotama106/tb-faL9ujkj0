@@ -2,10 +2,10 @@
 
    チケットの入力値:
      title, feat_name, feat_part, feat_ref, story_goal, story_refs[], mod   タイトル・対象のフィーチャー・ストーリー
-     scope_in[], scope_out[], scope_out_none              スコープ(スコープ内とスコープ外)
      proc_name, blocks[]                                  組み立て(部品の並び)
      ok_status, ok_body, ac_extra[]                       受け入れ条件(正常時と追加分)
      deps[], deps_none, branch, call, nonfunc, impact     制約事項・技術的補足
+   スコープは切り分けで整理するので、チケットには書かない。処理の流れは、受け入れ条件の各項目の下に書く。
    受け入れ条件は、部品の中のエラーハンドリング(エラーの欄、エラーにした「〇〇の場合」、
    エラーハンドリングの部品)を1件ずつ集めて作る */
 import { COMPONENTS, NA, NONE, NO_DISPLAY, errorHead, fillAc, type CaseVal, type CompDef, type ErrVal, type FieldDef } from "./components";
@@ -25,22 +25,14 @@ export const isBeTicket = (v: Values) => /(^|[/／])\s*BE\s*$/.test(t(v.feat_par
 export const isFrontTicket = (v: Values) => /(^|[/／])\s*(CLIENT・BFF|CLIENT|BFF)\s*$/.test(t(v.feat_part));
 export const displayOf = (e: ErrVal | undefined, v: Values) => t(e && e.display) || (isBeTicket(v) ? NO_DISPLAY : "");
 
-/* スコープ内の案。組み立てのいちばん外の部品の見出し(入れ物は「〇〇API」など) */
-export function scopeFromBlocks(defs: Defs, v: Values): string[] {
-  return arr(v.blocks).map(b => {
-    const def = defs[b.type];
-    const hf = def && headOf(def.fields);
-    const name = hf ? linesOf(b[hf.id])[0] || "" : "";
-    return name && def.container ? name + (def.suffix || "") : name;
-  }).filter(Boolean);
-}
 
 export const isEmptyErr = (e: ErrVal | undefined) => !e || !["display", "status", "code", "message", "note"].some(k => t((e as Values)[k]));
 
 /* 受け入れ条件。部品1つにつき1件(lead)を作り、その下にエラーハンドリングと「〇〇の場合」を並べる。
    err のない項目は文だけの受け入れ条件。path は入力値の中の位置(画面から同じエラーを編集するため) */
 export interface AcCase { label: string; err?: ErrVal; path?: Path }
-export interface AcGroup { lead: string; cases: AcCase[] }
+/* block はこの受け入れ条件の部品(いちばん外の並びの部品のとき)。flow はその処理の流れの行(本文を作るときに入れる) */
+export interface AcGroup { lead: string; cases: AcCase[]; block?: Values; flow?: string[] }
 
 /* 文を「〜こと」で終える。動詞・助動詞で終わるなら「こと」を、名詞(返却 など)で終わるなら「すること」を付ける */
 export function toKoto(raw: string): string {
@@ -61,7 +53,8 @@ export function collectAc(defs: Defs, v: Values): AcGroup[] {
   };
   const push = (lead: string, c: AcCase) => group(lead).cases.push(c);
   /* caseLabel は条件分岐の場合の中の部品のときの「〇〇場合」。中の部品の受け入れ条件の頭に付ける */
-  const walk = (blocks: unknown, base: Path, outer: string, caseLabel?: string) => arr(blocks).forEach((b, i) => {
+  /* top は、いちばん外の並び(チケットの直下、または大枠の中)の部品か。その部品の処理の流れを受け入れ条件の下に書く */
+  const walk = (blocks: unknown, base: Path, outer: string, caseLabel?: string, top = false) => arr(blocks).forEach((b, i) => {
     const p = [...base, i];
     const def = defs[b.type];
     if (!def) return;
@@ -77,7 +70,10 @@ export function collectAc(defs: Defs, v: Values): AcGroup[] {
     const withCase = (s: string) => (caseLabel ? caseLabel + "、" + s : s);
     /* 受け入れ条件を持たない部品(API作成)は、中のエラーがあるときだけ見出しを作る */
     const lead = own.length || !def.container ? withCase(leads[0]) : leads[0] + (def.suffix || "");
-    if (own.length || !def.container) group(lead);
+    if (own.length || !def.container) {
+      const g = group(lead);
+      if (top && !def.container && !g.block) g.block = b;
+    }
     leads.slice(1).forEach(l => group(withCase(l)));
     const fields = (fs: FieldDef[], o: Values, op: Path, rowName?: string) => fs.forEach(f => {
       if (!usable(f, o)) return;
@@ -96,7 +92,7 @@ export function collectAc(defs: Defs, v: Values): AcGroup[] {
         const rh = headOf(f.fields || []);
         arr(o[f.id]).forEach((r, j) => fields(f.fields || [], r, [...op, f.id, j], (rh && t(r[rh.id]).split("\n")[0]) || MISSING));
       } else if (f.kind === "blocks") {
-        walk(o[f.id], [...op, f.id], rowName && rowName !== MISSING ? rowName : lead);
+        walk(o[f.id], [...op, f.id], rowName && rowName !== MISSING ? rowName : lead, undefined, !!def.container);
       } else if (f.kind === "branches") {
         arr(o[f.id]).forEach((c, j) => {
           const cond = (t(c.cond) || MISSING) + "場合";
@@ -107,7 +103,7 @@ export function collectAc(defs: Defs, v: Values): AcGroup[] {
     });
     fields(def.fields, b, p);
   });
-  walk(v.blocks, ["blocks"], (t(v.proc_name) || MISSING) + "処理");
+  walk(v.blocks, ["blocks"], (t(v.proc_name) || MISSING) + "処理", undefined, true);
   return groups;
 }
 
@@ -128,7 +124,8 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
     return [bullet(d, label)].concat(ls.map(l => bullet(d + 1, l)));
   };
   const req = (s: unknown) => t(s) || miss();
-  let lenient = false;   /* イベントだけを扱う画面の、画面全体の仕様の欄は任意 */
+  let lenient = false;
+  let inSpec = false;   /* 大枠の仕様を書いているところ */   /* イベントだけを扱う画面の、画面全体の仕様の欄は任意 */
   const skip = (f: FieldDef) => !!f.optional || sparse || lenient;
 
   /* 欄1つ分(処理の流れ・仕様の中)。エラーは受け入れ条件にだけ出す */
@@ -163,6 +160,7 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
       case "blocks": {
         const items = arr(val);
         if (!items.length) return empty();
+        if (inSpec) return [];   /* 大枠の仕様の中の処理は、受け入れ条件の下の「処理の流れ」に書く */
         /* bare なら表記の行を出さず、中の部品を番号付きでそのまま並べる */
         if (f.bare) return blockLines(items, d, true);
         return [bullet(d, f.label)].concat(blockLines(items, d + 1, true));
@@ -232,18 +230,16 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
     const hf = headOf(def.fields);
     const out = ["", "## " + (hf ? req(b[hf.id]) : def.name) + (def.suffix || "")];
     const loose = (f: FieldDef) => (!!b.only_events && f.id !== "events") || (!!b.only_init && f.id === "events");
-    const spec = def.fields.filter(f => f.kind !== "blocks").flatMap(f => {
+    /* 中の処理(blocks)は受け入れ条件の下の「処理の流れ」に書くので、仕様には空のときの未記入だけを出す */
+    inSpec = true;
+    const spec = def.fields.flatMap(f => {
       lenient = loose(f);
       const ls = fieldLines(f, b, 0);
       lenient = false;
       return ls;
     });
+    inSpec = false;
     if (spec.length) out.push("### 仕様", "", ...spec);
-    def.fields.filter(f => f.kind === "blocks" && usable(f, b)).forEach(f => {
-      const items = arr(b[f.id]);
-      if (!items.length && (skip(f) || loose(f))) return;
-      out.push("", "### " + f.label, "", ...(items.length ? blockLines(items, 0, true) : ["1. " + miss()]));
-    });
     return out;
   }
 
@@ -261,39 +257,33 @@ export function buildImplTicket(g: Genre, v: Values, defs: Defs = COMPONENTS): T
     const out = ["## " + h.feature, "", ...valued(0, "フィーチャー", req(v.feat_name)), ...valued(0, "対象", req(v.feat_part))];
     out.push("", "## " + h.story, "", ...headed(0, req(v.story_goal)));
     if (refs.length) out.push("", "### " + h.storyRefs, "", ...refs.flatMap(r => headed(0, r)));
-    /* スコープはストーリーと同じ階層の節。スコープ外がないなら「なし」と明示する */
-    const inn = listItems(v.scope_in), outs = listItems(v.scope_out);
-    out.push("", "## " + h.scope, "### " + h.scopeIn, "");
-    if (inn.length) inn.forEach(x => out.push(...headed(0, x))); else out.push(bullet(0, miss()));
-    out.push("", "### " + h.scopeOut, "");
-    if (outs.length) outs.forEach(x => out.push(...headed(0, x)));
-    else out.push(bullet(0, v.scope_out_none ? "なし" : miss()));
+    /* スコープは切り分けで整理するので、チケットには書かない */
     return out;
   });
 
+  /* 処理の流れは、受け入れ条件の各項目の下に書く(〇〇すること → 処理の流れ → 1. 〇〇)。
+     行は組み立ての部品から作るので、未記入は「組み立て」で数える。本文の節になるのは大枠(API・画面・DB)の仕様だけ */
+  const groups = collectAc(defs, v);
+  let noBlocks = false;
   block("build", () => {
     const all = arr(v.blocks);
-    if (!all.length) return ["", "## " + h.flowTitle, "", "1. " + miss()];
+    if (!all.length) { noBlocks = true; miss(); return []; }
+    if (all.some(b => b.type === "error") && !t(v.proc_name)) miss();   /* 「〇〇処理のエラーハンドリング」の〇〇 */
+    groups.forEach(g => { if (g.block) g.flow = blockLines([g.block], 2, true); });
     const out: string[] = [];
-    let steps: Values[] = [];
-    const flush = () => {
-      if (!steps.length) return;
-      out.push("", "## " + req(v.proc_name) + h.flowSuffix, "### " + h.flowTitle, "", ...blockLines(steps, 0, true));
-      steps = [];
-    };
     all.forEach(b => {
       const def = defs[b.type];
-      if (def && def.container) { flush(); out.push(...containerLines(b, def)); }
-      else steps.push(b);
+      if (def && def.container) out.push(...containerLines(b, def));
     });
-    flush();
     return out;
   });
 
   block("ac", () => {
     const out = ["", "## " + h.ac, ""];
-    collectAc(defs, v).forEach(gr => {
+    if (noBlocks) out.push(bullet(0, MISSING));
+    groups.forEach(gr => {
       out.push(bullet(0, gr.lead));
+      if (gr.flow && gr.flow.length) out.push(bullet(1, h.flowTitle), ...gr.flow);
       gr.cases.forEach(c => out.push(bullet(1, c.label), ...(c.err ? errLines(c.err, 2) : [])));
     });
     /* 画面側(CLIENT・BFF)のチケットは、正常時のHTTPステータスを任意にする(書いたときだけ出す) */

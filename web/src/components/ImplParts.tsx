@@ -1,8 +1,8 @@
 /* 実装チケットの入力画面。パートは タイトルとストーリー / 組み立て / 受け入れ条件 / 制約事項・技術的補足 */
 import { MOD, NEW, type Genre, type QNode } from "../domain/genres";
-import { collectAc, isFrontTicket, scopeFromBlocks } from "../domain/impl";
+import { collectAc, isFrontTicket } from "../domain/impl";
 import { headsOf, type Values } from "../domain/ticket";
-import { defsOf, setValue, useStore } from "../state/store";
+import { defsOf, useStore } from "../state/store";
 import { BlockList, CodeLists, ErrorEditor } from "./Blocks";
 import { FeaturePick } from "./FeaturePick";
 import { Chips, Field, useV } from "./Fields";
@@ -24,28 +24,18 @@ export function ImplPart({ g, partKey }: { g: Genre; partKey: string }) {
         <ListControl node={listNode("story_refs", "参照するもの", "例: 機能AのアップロードAPIを参照する（PUT：/account/applications/documents/:documentType）")} />
       </div>
       <div className="node">
-        <div className="q">{h.scopeIn}は？(本チケットで実装すること。1件ずつ)</div>
-        <ListControl node={listNode("scope_in", h.scopeIn, "例: 書類をアップロードする基本的な機能")} />
-        <ScopeFromBlocks />
-      </div>
-      <div className="node">
-        <div className="q">{h.scopeOut}は？(本チケットでは実装しないこと。1件ずつ)</div>
-        <ListControl node={listNode("scope_out", h.scopeOut, "例: アップロードした書類の削除(別チケット)")} />
-        {!(Array.isArray(v.scope_out) ? v.scope_out : []).some((x: unknown) => typeof x === "string" && x.trim()) &&
-          <div className="none-chip"><Chips path={["scope_out_none"]} label="スコープ外がない" options={["なし"]} /></div>}
-      </div>
-      <div className="node">
         <div className="q">新規作成か、既存改修か？</div>
         <Chips path={["mod"]} label="作成区分" options={[NEW, MOD]} />
         {v.mod === MOD && <p className="hint">既存改修：変更する欄だけ記入します。記入のない欄は本文に出ません。既存影響は必ず書きます。</p>}
       </div>
     </>;
     case "build": {
-      const hasSteps = (Array.isArray(v.blocks) ? v.blocks : []).some((b: Values) => defs[b.type] && !defs[b.type].container);
+      /* いちばん外にエラーハンドリングの部品があるときだけ、受け入れ条件「〇〇処理のエラーハンドリング」の〇〇を問う */
+      const hasSteps = (Array.isArray(v.blocks) ? v.blocks : []).some((b: Values) => b.type === "error");
       return <>
         <CodeLists />
-        <p className="hint">部品を上から足して組み立てます。大枠（API・画面・DB）は本文の節になり、中に処理の部品を入れます。エラーハンドリングは、そのまま受け入れ条件になります。</p>
-        {hasSteps && <Field path={["proc_name"]} label={"処理の名前は？(大枠の外の部品の見出しが「〇〇" + h.flowSuffix + "」になります)"} ph="例: ファイルアップロード" />}
+        <p className="hint">部品を上から足して組み立てます。部品ごとに受け入れ条件ができ、その下に「処理の流れ」が入ります。大枠（API・画面・DB）は仕様が本文の節になり、中の処理の部品は受け入れ条件に入ります。エラーハンドリングは、そのまま受け入れ条件になります。</p>
+        {hasSteps && <Field path={["proc_name"]} label={"処理の名前は？(受け入れ条件「〇〇" + h.flowSuffix + "のエラーハンドリングが行われていること」の〇〇)"} ph="例: ファイルアップロード" />}
         <BlockList path={["blocks"]} top />
       </>;
     }
@@ -97,17 +87,3 @@ export function ImplPart({ g, partKey }: { g: Genre; partKey: string }) {
   return null;
 }
 
-/* 組み立てを直したあと、スコープ内を部品の見出しに合わせて作り直す */
-function ScopeFromBlocks() {
-  const v = useV();
-  const defs = useStore(s => defsOf(s.data));
-  const next = scopeFromBlocks(defs, v);
-  const cur = (Array.isArray(v.scope_in) ? v.scope_in : []).map((x: unknown) => String(x).trim()).filter(Boolean);
-  if (!next.length || next.join("\n") === cur.join("\n")) return null;
-  return (
-    <div className="scope-sync">
-      <span className="hint">組み立ての部品と、スコープ内が合っていません。</span>
-      <button type="button" className="plain small-btn" onClick={() => setValue(["scope_in"], next, false)}>組み立ての部品から作り直す（{next.join("、")}）</button>
-    </div>
-  );
-}

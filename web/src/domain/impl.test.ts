@@ -2,13 +2,13 @@
 import { describe, expect, it } from "vitest";
 import { COMPONENTS, NA, fillAc, toCan } from "./components";
 import { GENRES } from "./genres";
-import { collectAc, scopeFromBlocks } from "./impl";
+import { collectAc } from "./impl";
 import { buildTicket, type Values } from "./ticket";
 import { toImpl, upgradeImpl } from "../state/migrateImpl";
 
 const be = (status = "", code = "") => ({ display: "表示しない", status, code });
 const chk = (name: string, err = be(), detail = "") => ({ name, detail, err });
-const sample: Values = {
+export const sample: Values = {
   title: "ファイルアップロード機能の構築（BE）",
   feat_name: "書類のオンライン提出",
   feat_part: "書類提出画面 / アップロードボタン押下 / BE",
@@ -50,40 +50,17 @@ const expected = `## 対象のフィーチャー
 
 * 機能AのアップロードAPIを参照する（PUT：/account/applications/documents/:documentType）
 
-## スコープ
-### スコープ内
-
-* 書類をアップロードする基本的な機能
-
-### スコープ外
-
-* アップロードした書類の削除
-
-## ファイルアップロード処理
-### 処理の流れ
-
-1. アップロードファイルの業務チェック
-   * 0バイトファイルチェック
-   * ファイルサイズ超過チェック
-   * ファイル形式チェック
-      * 拡張子が「.pdf」かどうか
-   * ファイル名の存在チェック
-   * ファイルデータの存在チェック
-2. リクエストバリデーションチェック
-   * パスパラメータBの存在チェック
-   * パスパラメータBの13桁チェック
-   * ファイル存在チェック
-3. Xをキーにステータスを取得
-   * 取得元：申込
-   * 条件：申込ID
-   * 0件の場合：対象なしとして扱う
-4. ステータスを元に編集可否をチェック
-   * 編集可能な場合、何もしない
-   * 編集不可の場合、エラーを返却
-
 ## 受け入れ条件
 
 * ミドルウェアでバリデーションチェックが行われていること
+   * 処理の流れ
+      1. アップロードファイルの業務チェック
+         * 0バイトファイルチェック
+         * ファイルサイズ超過チェック
+         * ファイル形式チェック
+            * 拡張子が「.pdf」かどうか
+         * ファイル名の存在チェック
+         * ファイルデータの存在チェック
    * 0バイトファイルチェックでエラーになる場合
       * HTTPステータス：400
       * エラーコード：I009-00022
@@ -100,6 +77,11 @@ const expected = `## 対象のフィーチャー
       * HTTPステータス：400
       * エラーコード：E001-00002
 * リクエストバリデーションチェックが行われていること
+   * 処理の流れ
+      1. リクエストバリデーションチェック
+         * パスパラメータBの存在チェック
+         * パスパラメータBの13桁チェック
+         * ファイル存在チェック
    * パスパラメータBの存在チェックでエラーになる場合
       * HTTPステータス：400
       * エラーコード：E001-00002
@@ -110,8 +92,17 @@ const expected = `## 対象のフィーチャー
       * HTTPステータス：400
       * エラーコード：I009-00014
 * Xをキーにステータスを取得できること
+   * 処理の流れ
+      1. Xをキーにステータスを取得
+         * 取得元：申込
+         * 条件：申込ID
+         * 0件の場合：対象なしとして扱う
    * 0件の場合、対象なしとして扱うこと
 * ステータスによる編集可否のチェックが行われていること
+   * 処理の流れ
+      1. ステータスを元に編集可否をチェック
+         * 編集可能な場合、何もしない
+         * 編集不可の場合、エラーを返却
    * 編集可能な場合、何もしないこと
    * 編集不可の場合
       * HTTPステータス：【未記入】
@@ -137,6 +128,8 @@ describe("実装チケット", () => {
     /* サイズ超過の2件、編集不可の2件、正常時のステータス1件 */
     expect(r.missing).toBe(5);
     expect(r.blocks.map(b => [b.key, b.missing])).toEqual([["basic", 0], ["build", 0], ["ac", 5], ["notes", 0]]);
+    /* スコープは書かない */
+    expect(r.text).not.toContain("スコープ");
   });
 
   it("対象のフィーチャーが空なら未記入として数える", () => {
@@ -145,10 +138,10 @@ describe("実装チケット", () => {
     expect(r.blocks[0].missing).toBe(2);
   });
 
-  it("スコープ外がないときは「なし」を選ぶと未記入にならない", () => {
-    const base = { ...sample, scope_out: [] };
-    expect(buildTicket(GENRES.impl, base).text).toContain("### スコープ外\n\n* 【未記入】");
-    expect(buildTicket(GENRES.impl, { ...base, scope_out_none: true }).text).toContain("### スコープ外\n\n* なし");
+  it("スコープは切り分けで整理するので、本文に出さず、未記入にもしない", () => {
+    const r = buildTicket(GENRES.impl, { ...sample, scope_in: [], scope_out: [] });
+    expect(r.text).not.toContain("スコープ");
+    expect(r.missing).toBe(5);
   });
 
   it("空のチケットでは、各節に未記入を出す", () => {
@@ -167,11 +160,13 @@ describe("実装チケット", () => {
     const r = buildTicket(GENRES.impl, v);
     expect(r.text).toContain(["## 書類アップロードAPI", "### 仕様", "", "* メソッド：PUT", "* エンドポイント：/docs/:type", "* 呼び出し元・きっかけ・タイミング：画面から",
       "* リクエストパラメータ", "   * 原典：IF定義書", "* レスポンス（正常時）", "   * 項目", "      * id: string（必須）"].join("\n"));
-    expect(r.text).toContain(["### 処理の流れ", "", "1. ログイン中か確認", "   * 確認の方法：トークン", "2. 書類を登録", "   * 保存先：書類",
-      "   * 保存する項目", "      * 種類", "      * ファイル", "   * 同じリクエストが届いた場合：上書きする", "   * 保存に失敗した場合：エラーモーダルを表示"].join("\n"));
+    /* 中の処理は、受け入れ条件の各項目の下の「処理の流れ」に書く(大枠の節には書かない) */
+    expect(r.text).not.toContain("### 処理の流れ");
     expect(r.text).not.toContain("APIを呼び出すと");
-    expect(r.text).toContain(["## 受け入れ条件", "", "* ログイン中か確認できること", "   * 認証できない場合", "      * HTTPステータス：401", "      * エラーコード：E401",
-      "* 書類を登録できること", "   * 同じリクエストが届いた場合、上書きすること", "   * 保存に失敗した場合", "      * 表示：モーダル", "      * HTTPステータス：500", "      * エラーコード：E500", "      * エラーメッセージ：保存できません"].join("\n"));
+    expect(r.text).toContain(["## 受け入れ条件", "", "* ログイン中か確認できること", "   * 処理の流れ", "      1. ログイン中か確認", "         * 確認の方法：トークン",
+      "   * 認証できない場合", "      * HTTPステータス：401", "      * エラーコード：E401",
+      "* 書類を登録できること", "   * 処理の流れ", "      1. 書類を登録", "         * 保存先：書類", "         * 保存する項目", "            * 種類", "            * ファイル",
+      "         * 同じリクエストが届いた場合：上書きする", "         * 保存に失敗した場合：エラーモーダルを表示", "   * 同じリクエストが届いた場合、上書きすること", "   * 保存に失敗した場合", "      * 表示：モーダル", "      * HTTPステータス：500", "      * エラーコード：E500", "      * エラーメッセージ：保存できません"].join("\n"));
     /* 任意の「権限がない場合」は空なので受け入れ条件に出さない */
     expect(r.text).not.toContain("権限がない場合");
   });
@@ -182,7 +177,8 @@ describe("実装チケット", () => {
     const r = buildTicket(GENRES.impl, v);
     expect(r.text).toContain("   * 対象が見つからない場合、エラーを返却すること");
     expect(r.text).not.toContain("一部の対象で失敗した場合");
-    expect(r.blocks.find(b => b.key === "build")!.missing).toBe(1);   /* 処理の名前だけ */
+    expect(r.text).toContain("* 住所を更新できること\n   * 処理の流れ\n      1. 住所を更新\n         * 更新先：会員");
+    expect(r.blocks.find(b => b.key === "build")!.missing).toBe(0);
   });
 
   it("対象の部分が BE のチケットは、エラーの表示が空なら「表示しない」として扱う", () => {
@@ -191,11 +187,6 @@ describe("実装チケット", () => {
     expect(r.text).toContain("   * 認証できない場合\n      * HTTPステータス：401\n      * エラーコード：E1");
     expect(r.text).not.toContain("表示：");
     expect(buildTicket(GENRES.impl, { ...v, feat_part: "住所変更画面 / 変更ボタン押下 / CLIENT・BFF" }).text).toContain("* 表示：【未記入】");
-  });
-
-  it("スコープ内の案は、いちばん外の部品の見出し(入れ物は「〇〇API」)", () => {
-    expect(scopeFromBlocks(COMPONENTS, { blocks: [{ type: "api", name: "住所変更" }, { type: "do", name: "メールを送信\n詳細" }, { type: "check", name: "" }] }))
-      .toEqual(["住所変更API", "メールを送信"]);
   });
 
   it("「処理を書く」に「該当しない」と書いたものは、読み込み時に「該当しない」の選択にする", () => {
@@ -224,9 +215,8 @@ describe("実装チケット", () => {
     const r = buildTicket(GENRES.impl, { proc_name: "引き落とし", blocks: [{ type: "if", name: "残高を確認", cases: [
       { cond: "足りる", blocks: [{ type: "do", name: "引き落とす" }, { type: "do", name: "履歴を残す", detail: "取引IDを付ける" }] },
       { cond: "足りない", blocks: [{ type: "error", err: { display: "表示しない", status: "409", code: "E002-00001" } }] }] }] });
-    expect(r.text).toContain(["1. 残高を確認", "   * 足りる場合", "      * 引き落とす", "      * 履歴を残す",
-      "         * 取引IDを付ける", "   * 足りない場合、エラーを返却"].join("\n"));
-    expect(r.text).toContain(["* 残高を確認できること", "   * 足りない場合", "      * HTTPステータス：409"].join("\n"));
+    expect(r.text).toContain(["* 残高を確認できること", "   * 処理の流れ", "      1. 残高を確認", "         * 足りる場合", "            * 引き落とす", "            * 履歴を残す",
+      "               * 取引IDを付ける", "         * 足りない場合、エラーを返却", "   * 足りない場合", "      * HTTPステータス：409"].join("\n"));
     /* 場合の中の部品は、受け入れ条件の頭に「〇〇場合、」を付ける */
     expect(r.text).toContain(["* 足りる場合、引き落とすこと", "* 足りる場合、履歴を残すこと"].join("\n"));
   });
@@ -242,7 +232,8 @@ describe("実装チケット", () => {
                 { cond: "NGの", blocks: [{ type: "error", err: { display: "表示しない", status: "403", code: "E3" } }] }] }] }] },
           { cond: "法人の", blocks: [{ type: "do", name: "登記を確認する" }] }] },
         { type: "do", name: "確定日時を記録する" }] }] });
-    expect(r.text).toContain([
+    /* 処理の流れは、いちばん外の部品の受け入れ条件の下に、入れ子ごと書く */
+    expect(r.text).toContain(["## 受け入れ条件", "", "* 申込を確定できること", "   * 処理の流れ", ...[
       "1. 申込を確定する",
       "   1. 申込区分を確認",
       "      * 個人の場合",
@@ -252,8 +243,7 @@ describe("実装チケット", () => {
       "               * OKの場合、何もしない",
       "               * NGの場合、エラーを返却",
       "      * 法人の場合、登記を確認する",
-      "   2. 確定日時を記録する"].join("\n"));
-    expect(r.text).toContain(["## 受け入れ条件", "", "* 申込を確定できること", "* 申込区分を確認できること",
+      "   2. 確定日時を記録する"].map(l => "      " + l), "* 申込区分を確認できること",
       "* 個人の場合、本人確認できること", "* 確認結果を判定できること", "   * OKの場合、何もしないこと",
       "   * NGの場合", "      * HTTPステータス：403", "      * エラーコード：E3",
       "* 法人の場合、登記を確認できること", "* 確定日時を記録できること"].join("\n"));
@@ -290,8 +280,8 @@ describe("旧形式からの引き継ぎ", () => {
       { kind: "checks", text: "チェック", ac: "", items: [{ name: "a", detail: "", status: "400", code: "E1" }] },
       { kind: "if", text: "分岐", yes: "可能な", no: "不可の", thenNone: true, then: [], else: [{ kind: "error", status: "403", code: "E2" }] }] };
     const r = buildTicket(GENRES.impl, toImpl("logic", old));
-    expect(r.text).toContain(["1. チェック", "   * a", "2. 分岐", "   * 可能な場合、何もしない", "   * 不可の場合、エラーを返却"].join("\n"));
-    expect(r.text).toContain(["* チェックが行われていること", "   * aでエラーになる場合", "      * HTTPステータス：400", "      * エラーコード：E1"].join("\n"));
+    expect(r.text).toContain(["* チェックが行われていること", "   * 処理の流れ", "      1. チェック", "         * a", "   * aでエラーになる場合", "      * HTTPステータス：400", "      * エラーコード：E1"].join("\n"));
+    expect(r.text).toContain(["   * 処理の流れ", "      1. 分岐", "         * 可能な場合、何もしない", "         * 不可の場合、エラーを返却"].join("\n"));
   });
   it("API作成の観点表を、API作成の部品とデータ操作の部品に移す", () => {
     const n = toImpl("api", { api_name: "振込先登録API", method: "POST", endpoint: "/payees", post_db: "振込先", post_dup_kind: "エラーモーダル",

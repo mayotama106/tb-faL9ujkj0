@@ -89,18 +89,18 @@ describe("切り分けから作るチケット本文", () => {
     const f = base();
     const v = docValues(f, tk(f, "書類の情報を登録"), key);
     expect(v.blocks.map((b: Values) => b.type)).toEqual(["create", "error"]);
-    expect([v.feat_name, v.feat_part, v.scope_in]).toEqual(["書類のオンライン提出", "書類提出画面 / 保存ボタン押下 / 書類の情報を登録 / BE", ["書類の情報を登録"]]);
+    expect([v.feat_name, v.feat_part]).toEqual(["書類のオンライン提出", "書類提出画面 / 保存ボタン押下 / 書類の情報を登録 / BE"]);
     expect(v.feat_ref).toEqual({ featureId: "f", entry: "e1", event: "v1", layer: "item", item: "i2" });
     const text = buildTicket(GENRES.impl, v).text;
-    expect(text).toContain("## 保存ボタン押下処理\n### 処理の流れ\n\n1. 書類の情報を登録");
-    expect(text).toContain("2. 書類の情報を登録でエラーになる場合はエラーを返却");
-    expect(text).toContain("* 書類の情報を登録できること");
+    expect(text).toContain("* 書類の情報を登録できること\n   * 処理の流れ\n      1. 書類の情報を登録");
+    expect(text).toContain("* 保存ボタン押下処理のエラーハンドリングが行われていること\n   * 書類の情報を登録でエラーになる場合");
   });
   it("画面側のチェック1つのチケット: 画面作成のイベントの処理に入れ、画面全体の仕様は任意にする", () => {
     const f = base();
     const v = docValues(f, tk(f, "ファイル形式チェック"), key);
     const text = buildTicket(GENRES.impl, v).text;
-    expect(text).toContain("   * 保存ボタン押下\n      * きっかけ：クリック\n      * 処理\n         1. ファイル形式チェック\n            * 拡張子が.pdfでない");
+    expect(text).toContain("* イベント\n   * 保存ボタン押下\n      * きっかけ：クリック\n\n## 受け入れ条件");
+    expect(text).toContain("* ファイル形式チェックが行われていること\n   * 処理の流れ\n      1. ファイル形式チェック\n         * 拡張子が.pdfでない");
     expect(text).not.toContain("画面ID");
     expect(text).not.toContain("画面が表示されること");
     expect(text).not.toContain("正常に処理が完了した場合");

@@ -157,12 +157,12 @@ export function statusCount(cells: FCell[]): Record<Status, number> {
 export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
   const base = {
     _impl: 1, title: tk.title, feat_title: tk.title, story_goal: t(f.goal),
-    feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk), scope_out: []
+    feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk)
   };
   if (tk.kind === "screen") {
     const events = tk.entry.events.filter(ev => t(ev.name) !== ENTRY_KINDS.screen.first)
       .map(ev => ({ _k: key(), name: t(ev.name), trig: trigOf(t(ev.name)), steps: [] }));
-    return { ...base, scope_in: [entryLabel(tk.entry) + "の表示と、イベントの受け付け"], proc_name: "",
+    return { ...base, proc_name: "",
       blocks: [{ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)), events, only_init: !events.length }] };
   }
   const it = tk.item!, ev = tk.event!;
@@ -177,11 +177,11 @@ export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
   /* 画面側(CLIENT)のチェック・ロジックは、画面作成の部品のイベントの処理に入れる(画面全体の仕様は「画面の作成」のチケットで書く) */
   if (tk.entry.kind === "screen" && (it.layer === "front" || it.layer === "client")) {
     const init = t(ev.name) === ENTRY_KINDS.screen.first;
-    return { ...base, scope_in: [t(it.name)].filter(Boolean), proc_name: "",
+    return { ...base, proc_name: "",
       blocks: [{ ...newBlock(COMPONENTS.screen, key), name: screenBase(t(tk.entry.name)), only_events: true,
         ...(init ? { init: steps, events: [] } : { events: [{ _k: key(), name: t(ev.name), trig: trigOf(t(ev.name)), steps }] }) }] };
   }
-  return { ...base, scope_in: [t(it.name)].filter(Boolean), proc_name: t(ev.name), blocks: steps };
+  return { ...base, proc_name: t(ev.name), blocks: steps };
 }
 
 /* エラーハンドリングのチケットの「どんな場合？」。理由があれば「理由場合（チェック名）」、なければ「チェック名でエラーになる場合」 */

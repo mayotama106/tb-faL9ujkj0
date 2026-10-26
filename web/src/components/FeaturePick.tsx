@@ -66,7 +66,7 @@ export function FeaturePick({ kind, optional }: { kind: "impl" | "st"; optional?
         </div>
       )}
       <Field path={["feat_name"]} label="フィーチャー" ph="例: 会員情報の住所変更" />
-      {kind === "impl" && <Field path={["feat_part"]} label="対象の部分(画面・処理 / イベント / 開発領域)" ph="例: 住所変更画面 / 変更ボタン押下 / BE" />}
+      {kind === "impl" && <Field path={["feat_part"]} label="対象の部分(画面・処理 / イベント / チェック・ロジック / 開発領域)" ph="例: 住所変更画面 / 変更ボタン押下 / 住所を更新 / BE" />}
     </div>
   );
 }
