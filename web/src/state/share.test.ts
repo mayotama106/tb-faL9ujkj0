@@ -1,6 +1,6 @@
 /* チケット・切り分けの受け渡し: 書き出し、読み込み、同じものがあるときの上書きと別に追加 */
 import { describe, expect, it } from "vitest";
-import { newStCell, type Feature } from "../domain/feature";
+import { newCell, newStCell, type Feature } from "../domain/feature";
 import { conflictsOf, mergePack, packText, parsePack } from "./share";
 import type { Data, Doc } from "./store";
 
@@ -9,10 +9,9 @@ const key = () => "new" + n++;
 const doc = (id: string, title: string, extra = {}): Doc => ({ id, genre: "impl", v: { _impl: 1, title, ...extra }, createdAt: 1, updatedAt: 1 });
 const feat = (id: string, docId?: string): Feature => ({
   id, name: "住所変更", goal: "", createdAt: 1, updatedAt: 1, st: newStCell(),
-  entries: [{ _k: "e", kind: "screen", name: "住所変更", events: [{ _k: "v", name: "初期表示", items: [],
-    cells: { client: { on: true, docId }, bff: { on: false }, be: { on: true }, err: { on: true } } }] }]
+  entries: [{ _k: "e", kind: "screen", name: "住所変更", cell: { ...newCell(), docId }, events: [{ _k: "v", name: "初期表示", items: [] }] }]
 });
-const data = (): Data => ({ docs: [doc("d1", "画面の実装", { feat_ref: { featureId: "f1", entry: "e", event: "v", layer: "client" } }), doc("d2", "別のチケット")],
+const data = (): Data => ({ docs: [doc("d1", "画面の実装", { feat_ref: { featureId: "f1", entry: "e", event: "", layer: "screen" } }), doc("d2", "別のチケット")],
   features: [feat("f1", "d1")], templates: {}, comps: {} });
 
 describe("受け渡し", () => {
@@ -37,10 +36,10 @@ describe("受け渡し", () => {
     const nf = d.features[0], nd = d.docs[0];
     expect(nf.id).not.toBe("f1");
     expect(nf.name).toBe("住所変更（読み込み）");
-    expect(nf.entries[0].events[0].cells.client.docId).toBe(nd.id);
+    expect(nf.entries[0].cell!.docId).toBe(nd.id);
     expect(nd.v.feat_ref.featureId).toBe(nf.id);
     /* 元のものは変わらない */
-    expect(d.features[1].entries[0].events[0].cells.client.docId).toBe("d1");
+    expect(d.features[1].entries[0].cell!.docId).toBe("d1");
   });
   it("上書きすると、同じ場所で置き換える", () => {
     const d = data();

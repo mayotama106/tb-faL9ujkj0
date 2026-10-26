@@ -2,8 +2,8 @@
    必要なチケットを漏れなくダブりなく決め、実施状況を追い、Excelに書き出す */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ENTRY_KINDS, EXCEL_HEADER, FRONT, ITEM_KINDS, LAYERS, STATUSES, layerName, layersOf, buildFeature, contentOf, defaultTitle, docValues,
-  cellsOf, entryLabel, excelRows, issuesOf, newEntry, newEvent, newItem, newStCell, statusCount, stTitle, stValues, ticketsOf,
+  ENTRY_KINDS, EXCEL_HEADER, ITEM_KINDS, LAYERS, SCREEN_TICKET, STATUSES, buildFeature, contentOf, docValues,
+  cellsOf, entryLabel, excelRows, issuesOf, newCell, newEntry, newEvent, newItem, newStCell, statusCount, stTitle, stValues, ticketsOf,
   type EntryKind, type FCell, type FEntry, type FEvent, type FItem, type Feature, type FTicket, type Layer, type Status
 } from "../domain/feature";
 import { MISSING } from "../domain/genres";
@@ -203,7 +203,7 @@ function PartsEditor({ f }: { f: Feature }) {
       <ul>
         <li>画面ごとに、操作(ボタン押下・入力・表示)をイベントとして全部挙げたか。初期表示もイベント</li>
         <li>イベントの中のチェック(入力・業務・権限)と、ロジック(取得・登録・更新・削除・外部連携)を全部挙げたか</li>
-        <li>チェック・ロジックごとに、実装する開発領域(CLIENT・BFF か BE)と、エラーハンドリングの有無を決めたか</li>
+        <li>チェック・ロジックごとに、実装する開発領域（CLIENT・BFF / CLIENT / BFF / BE）と、エラーハンドリングの有無を決めたか。チェック・ロジック1つが1チケットになります</li>
         <li><b>画面を介さないもの</b>(バッチ・定期実行、外部システムからの呼び出し、手動の運用作業)がないか</li>
       </ul>
     </div>
@@ -232,7 +232,7 @@ function EntryView({ e, i, handle }: { e: FEntry; i: number; handle: ReactNode }
         <span className="spacer" />
         <Del label={k.name + "を削除"} onClick={() => removeAt(["entries"], i, k.name)} />
       </div>
-      {e.kind !== "screen" && <p className="hint">画面を介さない処理です。チケットは BE とエラーハンドリングになります。</p>}
+      {e.kind !== "screen" && <p className="hint">画面を介さない処理です。チェック・ロジックは BE のチケットになります。</p>}
       <FText path={[...base, "name"]} label={k.name + "の名前は？"} ph={k.ph} />
       <Kids>
         <SortableList ids={e.events.map(ev => ev._k)} onMove={(a, b) => editFeature(ff => move(ff.entries[i].events, a, b))}>
@@ -280,7 +280,7 @@ function EventView({ e, ev, i, j, handle }: { e: FEntry; ev: FEvent; i: number; 
       </div>
       <Kids>
         <SortableList ids={ev.items.map(it => it._k)} onMove={(a, b) => editFeature(ff => move(ff.entries[i].events[j].items, a, b))}>
-          {(_id, n, h) => <ItemView it={ev.items[n]} split={!!ev.split} screen={e.kind === "screen"} path={[...base, "items", n]} n={n} handle={h} onDelete={() => removeAt([...base, "items"], n, ITEM_KINDS[ev.items[n].kind])} />}
+          {(_id, n, h) => <ItemView it={ev.items[n]} screen={e.kind === "screen"} path={[...base, "items", n]} n={n} handle={h} onDelete={() => removeAt([...base, "items"], n, ITEM_KINDS[ev.items[n].kind])} />}
         </SortableList>
         <div className="links">
           <button type="button" className="etc-btn pal-data" onClick={() => add("check")}>＋ チェック</button>
@@ -291,7 +291,7 @@ function EventView({ e, ev, i, j, handle }: { e: FEntry; ev: FEvent; i: number; 
   );
 }
 
-function ItemView({ it, split, screen, path, n, handle, onDelete }: { it: FItem; split: boolean; screen: boolean; path: Path; n: number; handle: ReactNode; onDelete: () => void }) {
+function ItemView({ it, screen, path, n, handle, onDelete }: { it: FItem; screen: boolean; path: Path; n: number; handle: ReactNode; onDelete: () => void }) {
   const name = ITEM_KINDS[it.kind];
   return (
     <div className="check-item">
@@ -303,12 +303,9 @@ function ItemView({ it, split, screen, path, n, handle, onDelete }: { it: FItem;
       </div>
       <div className="err-row">
         <span className="lbl">開発領域</span>
-        {!screen && it.layer === "be" ? <span className="fixed-layer">BE</span> : split
-          ? (["client", "bff", "be"] as const).map(l => <Chip key={l} on={it.layer === l} onClick={() => setF([...path, "layer"], l, false)}>{LAYERS[l]}</Chip>)
-          : <>
-            <Chip on={it.layer !== "be"} onClick={() => { if (it.layer === "be") setF([...path, "layer"], it.kind === "check" ? "bff" : "client", false); }}>{FRONT}</Chip>
-            <Chip on={it.layer === "be"} onClick={() => setF([...path, "layer"], "be", false)}>BE</Chip>
-          </>}
+        {/* 画面を介さない処理は BE だけ。画面は CLIENT・BFF(まとめる)・CLIENT・BFF・BE から選ぶ */}
+        {!screen && it.layer === "be" ? <span className="fixed-layer">BE</span>
+          : (["front", "client", "bff", "be"] as Layer[]).map(l => <Chip key={l} on={it.layer === l} onClick={() => setF([...path, "layer"], l, false)}>{LAYERS[l]}</Chip>)}
         <span className="lbl">エラーハンドリング</span>
         {(["あり", "なし"] as const).map(x => <Chip key={x} on={it.err === x} onClick={() => setF([...path, "err"], it.err === x ? "" : x, false)}>{x}</Chip>)}
       </div>
@@ -317,69 +314,73 @@ function ItemView({ it, split, screen, path, n, handle, onDelete }: { it: FItem;
   );
 }
 
-/* 切り分けと実施状況: イベントごとに、開発領域のチケットのマス(オン・オフ、タイトル、実施状況) */
+/* 切り分けと実施状況: チェック・ロジック1つにつき1枚、画面1つにつき「画面の作成」1枚のカード(タイトル、実施状況) */
 function SplitEditor({ f }: { f: Feature }) {
   const cells = cellsOf(f);
   const c = statusCount(cells);
   const issues = issuesOf(f).filter(x => x.part === "split");
   const data = useStore(s => s.data);
+  const tks = ticketsOf(f);
   const docMissing = (id: string) => {
     const d = data.docs.find(x => x.id === id);
     return d ? buildTicket(genreOf(data, d.genre), d.v, defsOf(data)).missing : null;
   };
+  const restore = (path: Path, cell: FCell | undefined) => setF(path, { ...(cell || newCell()), on: true }, false);
   return <>
-    <p className="hint">イベントごとに、開発領域（CLIENT・BFF / BE / エラーハンドリング）のチケットが自動でそろいます。カード1枚が1チケットです。CLIENT と BFF を別のチケットにするときは「CLIENTとBFFを分ける」を、不要なもの（BE が要らないなど）は × を押します。</p>
+    <p className="hint">「洗い出し」のチェック・ロジック1つにつき1枚、画面1つにつき「{SCREEN_TICKET}」を1枚、チケットにします。エラーハンドリングありのものは、そのチケットの中でエラーも扱います。カード1枚が1チケットです。ほかのチケットで扱うものは × で外せます。</p>
     <div className="status-sum">
       <span>チケット{cells.length}件</span>
       {STATUSES.map(s => <span key={s} className={"st-pill st-" + STATUSES.indexOf(s)}>{s} {c[s]}</span>)}
       <span className="spacer" />
       <button type="button" className="primary small" onClick={() => exportExcel([f], f.name.trim() || "チケット一覧")}>Excelに書き出す</button>
     </div>
-    {f.entries.map((e, i) => (
-      <div key={e._k} className="split-entry">
-        <div className="q">{(e.kind === "screen" ? "" : "［" + ENTRY_KINDS[e.kind].name + "］") + entryLabel(e)}</div>
-        {e.events.map((ev, j) => (
-          <div key={ev._k} className="split-event">
-            <div className="split-ev-name">
-              <span>{ENTRY_KINDS[e.kind].event}：{ev.name.trim() || MISSING}</span>
-              {/* CLIENT・BFF は画面のときだけ(画面を介さない処理は BE とエラーハンドリング) */}
-              {e.kind === "screen" && <button type="button" className="link small" onClick={() => toggleSplit(["entries", i, "events", j])}>
-                {ev.split ? FRONT + "を1チケットにまとめる" : "CLIENTとBFFを分ける"}</button>}
-              {layersOf(ev).filter(l => !ev.cells[l]?.on && (e.kind === "screen" || l === "be" || l === "err")).map(l => (
-                <button key={l} type="button" className="etc-btn small-btn" title="削除したチケットを戻す"
-                  onClick={() => setF(["entries", i, "events", j, "cells", l, "on"], true, false)}>＋ {layerName(ev, l)}</button>
-              ))}
+    {f.entries.map((e, i) => {
+      const screenTk = tks.find(x => x.kind === "screen" && x.entry === e);
+      return (
+        <div key={e._k} className="split-entry">
+          <div className="q">{(e.kind === "screen" ? "" : "［" + ENTRY_KINDS[e.kind].name + "］") + entryLabel(e)}</div>
+          {e.kind === "screen" && (
+            <div className="split-event">
+              <div className="split-ev-name">
+                <span>{SCREEN_TICKET}（画面の表示・要素・イベントの受け付け）</span>
+                {!screenTk && <button type="button" className="etc-btn small-btn" title="外したチケットを戻す" onClick={() => restore(["entries", i, "cell"], e.cell)}>＋ {SCREEN_TICKET}</button>}
+              </div>
+              {screenTk && <div className="cells"><Cell f={f} tk={screenTk} docMissing={docMissing} /></div>}
             </div>
-            {!layersOf(ev).some(l => ev.cells[l]?.on) && <p className="hint">チケットはありません（上の「＋」で戻せます）。</p>}
-            <div className="cells">
-              {layersOf(ev).filter(l => ev.cells[l]?.on).map(l => <Cell key={l} f={f} e={e} ev={ev} l={l} path={["entries", i, "events", j, "cells", l]} docMissing={docMissing} />)}
-            </div>
-          </div>
-        ))}
-      </div>
-    ))}
+          )}
+          {e.events.map((ev, j) => {
+            const mine = tks.filter(x => x.event === ev);
+            const off = ev.items.map((it, n) => ({ it, n })).filter(({ it }) => !(it.cell && it.cell.on));
+            return (
+              <div key={ev._k} className="split-event">
+                <div className="split-ev-name">
+                  <span>{ENTRY_KINDS[e.kind].event}：{ev.name.trim() || MISSING}</span>
+                  {off.map(({ it, n }) => (
+                    <button key={it._k} type="button" className="etc-btn small-btn" title="外したチケットを戻す"
+                      onClick={() => restore(["entries", i, "events", j, "items", n, "cell"], it.cell)}>＋ {it.name.trim() || ITEM_KINDS[it.kind]}</button>
+                  ))}
+                </div>
+                {!ev.items.length && <p className="hint">チェック・ロジックはありません（「洗い出し」で足します）。</p>}
+                {mine.length > 0 && <div className="cells">{mine.map(tk => <Cell key={tk.item!._k} f={f} tk={tk} docMissing={docMissing} />)}</div>}
+              </div>
+            );
+          })}
+        </div>
+      );
+    })}
     {!f.entries.length && <p className="hint">「洗い出し」で画面などを足すと、ここにチケットが並びます。</p>}
     <div className="split-entry">
       <div className="q">フィーチャー全体</div>
       <div className="split-event">
         <div className="split-ev-name">
           <span>ST（フィーチャー全体を通して確かめる）</span>
-          {!(f.st && f.st.on) && <button type="button" className="etc-btn small-btn" title="削除したチケットを戻す" onClick={() => setF(["st"], { ...(f.st || newStCell()), on: true }, false)}>＋ ST</button>}
+          {!(f.st && f.st.on) && <button type="button" className="etc-btn small-btn" title="外したチケットを戻す" onClick={() => setF(["st"], { ...(f.st || newStCell()), on: true }, false)}>＋ ST</button>}
         </div>
         {f.st && f.st.on && <div className="cells"><StCell f={f} cell={f.st} docMissing={docMissing} /></div>}
       </div>
     </div>
     {issues.length > 0 && <div className="guide"><div className="q">確認事項</div><ul>{issues.map((x, i) => <li key={i}>{x.text}</li>)}</ul></div>}
   </>;
-}
-
-/* CLIENT と BFF を分ける・まとめる。分けるときは、BFF のマスを CLIENT のマスの状態から始める */
-function toggleSplit(path: Path) {
-  editFeature(ff => {
-    const x = getAt(ff, path) as FEvent;
-    if (!x.split) { const c = x.cells.client; x.cells.bff = { on: c.on, status: c.status || "未着手" }; }
-    x.split = !x.split;
-  });
 }
 
 /* フィーチャー全体のSTチケットのカード */
@@ -403,25 +404,24 @@ function StCell({ f, cell, docMissing }: { f: Feature; cell: FCell; docMissing: 
   );
 }
 
-function Cell({ f, e, ev, l, path, docMissing }: { f: Feature; e: FEntry; ev: FEvent; l: Layer; path: Path; docMissing: (id: string) => number | null }) {
-  const cell = ev.cells[l] || { on: false };
-  const tk = ticketsOf(f).find(x => x.event._k === ev._k && x.layer === l);
-  if (!tk) return null;
+function Cell({ tk, docMissing }: { f: Feature; tk: FTicket; docMissing: (id: string) => number | null }) {
+  const { cell, path } = tk;
   const m = cell.docId ? docMissing(cell.docId) : null;
   const content = contentOf(tk);
+  const name = tk.kind === "screen" ? SCREEN_TICKET : (tk.item!.name.trim() || ITEM_KINDS[tk.item!.kind]);
   return (
     <div className={"cell st-b" + STATUSES.indexOf(cell.status || "未着手")}>
       <div className="cell-head">
-        <span className="lname">{layerName(ev, l)}</span>
+        <span className="lname">{tk.lname}</span>
         <span className="spacer" />
-        <Del label={layerName(ev, l) + "のチケットを削除"} onClick={() => { setF([...path, "on"], false, false); toast(layerName(ev, l) + "のチケットを削除しました", true); }} />
+        <Del label={name + "のチケットを外す"} onClick={() => { setF([...path, "on"], false, false); toast("「" + name + "」のチケットを外しました", true); }} />
       </div>
-      <AutoText id={fid([...path, "title"])} value={cell.title || ""} placeholder={defaultTitle(e, ev, l)} label={layerName(ev, l) + "のチケットタイトル"}
+      <AutoText id={fid([...path, "title"])} value={cell.title || ""} placeholder={tk.title} label={name + "のチケットタイトル"}
         onChange={s => setF([...path, "title"], s)} />
-      <select value={cell.status || "未着手"} aria-label={layerName(ev, l) + "の実施状況"} onChange={x => setF([...path, "status"], x.target.value as Status, false)}>
+      <select value={cell.status || "未着手"} aria-label={name + "の実施状況"} onChange={x => setF([...path, "status"], x.target.value as Status, false)}>
         {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
-      {content.length > 0 ? <ul className="cell-items">{content.map((x, i) => <li key={i}>{x}</li>)}</ul> : <span className="meta">中身（チェック・ロジック）はありません</span>}
+      <ul className="cell-items">{content.map((x, i) => <li key={i}>{x}</li>)}</ul>
       {cell.docId && m != null
         ? <button type="button" className="link small" onClick={() => openDoc(cell.docId!)}>チケット本文を開く（{m ? "未記入" + m + "件" : "記入済み"}）</button>
         : <button type="button" className="link small" onClick={() => createDoc(tk)}>チケット本文を作る</button>}
@@ -471,7 +471,7 @@ export function FeatureWelcome() {
   return (
     <section className="card welcome">
       <h2>チケットを切り分ける</h2>
-      <p className="hint">フィーチャーを実装するのに必要なチケットを、漏れなくダブりなく切り分けます。画面を足すとイベントが入り、イベントごとに CLIENT・BFF / BE / エラーハンドリングのチケットが自動でそろいます。実施状況を付けて、Excelに書き出して共有できます。</p>
+      <p className="hint">フィーチャーを実装するのに必要なチケットを、漏れなくダブりなく切り分けます。画面を足すとイベントが入り、チェック・ロジック1つにつき1枚、画面1つにつき「画面の作成」1枚のチケットができます。実施状況を付けて、Excelに書き出して共有できます。</p>
       <button type="button" className="primary" onClick={createFeature}>＋ 切り分けを始める</button>
     </section>
   );

@@ -1,15 +1,14 @@
 /* チケットと切り分けの受け渡し。選んだものをファイル(.json)に書き出し、別の人・別のブラウザで読み込んで足す。
    今の内容は消さない。同じもの(同じID)があれば、1件ずつ「上書き」か「別に追加」を選ぶ。
    切り分けは、つながっているチケット本文もいっしょに書き出し、読み込んだあともつながりを保つ */
-import { migrateFeature, type Feature } from "../domain/feature";
+import { allCells, migrateFeature, type Feature } from "../domain/feature";
 import { normalizeDoc } from "./persist";
 import type { Data, Doc } from "./store";
 
 export interface Pack { docs: Doc[]; features: Feature[] }
 export type Choice = "overwrite" | "copy";
 
-const linkedDocIds = (f: Feature) => f.entries.flatMap(e => e.events.flatMap(ev => Object.values(ev.cells).map(c => c.docId)))
-  .concat(f.st && f.st.docId ? [f.st.docId] : []).filter((x): x is string => !!x);
+const linkedDocIds = (f: Feature) => allCells(f).map(c => c.docId).filter((x): x is string => !!x);
 
 /* 書き出すファイルの中身。切り分けにつながっているチケット本文も入れる */
 export function packText(data: Data, docIds: string[], featureIds: string[]): string {
@@ -64,8 +63,7 @@ export function mergePack(data: Data, pack: Pack, choices: Record<string, Choice
   });
   const relink = (id?: string) => (id && docMap.has(id) ? docMap.get(id) : id);
   features.forEach(f => {
-    f.entries.forEach(e => e.events.forEach(ev => Object.values(ev.cells).forEach(c => { if (c.docId) c.docId = relink(c.docId); })));
-    if (f.st && f.st.docId) f.st.docId = relink(f.st.docId);
+    allCells(f).forEach(c => { if (c.docId) c.docId = relink(c.docId); });
   });
   /* 上書きはその場で置き換え、追加は先頭に入れる */
   const put = <T extends { id: string }>(list: T[], items: T[]) => items.slice().reverse().forEach(x => {
