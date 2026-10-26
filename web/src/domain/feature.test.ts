@@ -173,6 +173,17 @@ describe("フィーチャー全体のST", () => {
 });
 
 describe("Excel", () => {
+  it("欠けたデータ(null)のある切り分けも読み込めて、書き出せる", () => {
+    const f = migrateFeature({ id: "x", name: "欠け", entries: [{ kind: "screen", name: "画面", events: [{ name: "押下", items: [{ name: "a" }, null] }, null] }, null, 3] });
+    expect(f.entries).toHaveLength(1);
+    expect(f.entries[0].events[0].items.map(i => i.name)).toEqual(["a"]);
+    const bytes = buildXlsx(excelRows([f]));
+    expect(String.fromCharCode(bytes[0], bytes[1])).toBe("PK");
+  });
+  it("文字列でない値があっても、書き出せる", () => {
+    const s = new TextDecoder().decode(buildXlsx([["a", "b"], [1 as unknown as string, undefined as unknown as string]]));
+    expect(s).toContain('<t xml:space="preserve">1</t>');
+  });
   it("列の名前", () => {
     expect([0, 25, 26, 27, 701, 702].map(colName)).toEqual(["A", "Z", "AA", "AB", "ZZ", "AAA"]);
   });

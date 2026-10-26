@@ -276,11 +276,13 @@ export function migrateFeature(raw: unknown): Feature {
   const cellOf = (c: Values | undefined, keepDoc = true): FCell => (c && typeof c === "object"
     ? { on: c.on !== false, status: STATUSES.includes(c.status) ? c.status : "未着手", ...(t(c.title) ? { title: t(c.title) } : {}), ...(keepDoc && c.docId ? { docId: c.docId } : {}) }
     : newCell());
-  const entries: FEntry[] = (Array.isArray(o.entries) ? o.entries : []).map((e: Values) => {
+  /* 欠けたデータ(null など)は読み飛ばす */
+  const objs = (x: unknown): Values[] => (Array.isArray(x) ? x.filter(y => y && typeof y === "object") : []);
+  const entries: FEntry[] = objs(o.entries).map((e: Values) => {
     const kind: EntryKind = ENTRY_KINDS[e.kind as EntryKind] ? e.kind : "other";
-    const events: FEvent[] = (Array.isArray(e.events) ? e.events : []).map((ev: Values) => {
+    const events: FEvent[] = objs(e.events).map((ev: Values) => {
       const oc: Values = ev.cells && typeof ev.cells === "object" ? ev.cells : {};
-      const rawItems: Values[] = Array.isArray(ev.items) ? ev.items : [];
+      const rawItems: Values[] = objs(ev.items);
       const layerOf = (it: Values): Layer => (kind !== "screen" ? "be" : it.layer === "be" ? "be" : it.layer === "front" || it.layer === "client" || it.layer === "bff" ? "front" : it.kind === "check" ? "front" : "be");
       let beDocUsed = false;
       const items: FItem[] = rawItems.map(it => {

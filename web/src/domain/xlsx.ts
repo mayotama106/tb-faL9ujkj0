@@ -58,7 +58,7 @@ export function zip(files: { name: string; data: Uint8Array }[]): Uint8Array {
 export function buildXlsx(rows: string[][], sheetName = "チケット", widths: number[] = []): Uint8Array {
   const cols = Math.max(1, ...rows.map(r => r.length));
   const sheetRows = rows.map((r, i) => `<row r="${i + 1}">` + r.map((v, j) =>
-    `<c r="${colName(j)}${i + 1}" t="inlineStr" s="${i === 0 ? 1 : 2}"><is><t xml:space="preserve">${esc(v)}</t></is></c>`).join("") + "</row>").join("");
+    `<c r="${colName(j)}${i + 1}" t="inlineStr" s="${i === 0 ? 1 : 2}"><is><t xml:space="preserve">${esc(v == null ? "" : String(v))}</t></is></c>`).join("") + "</row>").join("");
   const colXml = Array.from({ length: cols }, (_, j) => `<col min="${j + 1}" max="${j + 1}" width="${widths[j] || 14}" customWidth="1"/>`).join("");
   const last = colName(cols - 1) + Math.max(1, rows.length);
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

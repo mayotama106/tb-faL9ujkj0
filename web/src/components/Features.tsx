@@ -88,8 +88,14 @@ function openDoc(id: string) {
   setUI({ view: "tickets", currentId: id, editing: false });
   window.scrollTo(0, 0);
 }
+/* 書き出せなかったときは、理由を出す(黙って何も起きない、をなくす) */
 function exportExcel(features: Feature[], name: string) {
-  downloadXlsx(buildXlsx(excelRows(features), "チケット", WIDTHS), name);
+  try {
+    downloadXlsx(buildXlsx(excelRows(features), "チケット", WIDTHS), name);
+  } catch (e) {
+    console.error(e);
+    toast("Excelに書き出せませんでした：" + (e instanceof Error ? e.message : String(e)));
+  }
 }
 
 /* ===== 入力の部品 ===== */
