@@ -2,7 +2,7 @@
    必要なチケットを漏れなくダブりなく決め、実施状況を追い、Excelに書き出す */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ENTRY_KINDS, ERR, EXCEL_HEADER, FRONT, ITEM_KINDS, LAYERS, LAYER_KEYS, STATUSES, buildFeature, contentOf, docValues,
+  ENTRY_KINDS, ERR, EXCEL_HEADER, ITEM_KINDS, LAYERS, LAYER_KEYS, layerOf, STATUSES, buildFeature, contentOf, docValues,
   cellsOf, entryLabel, excelRows, issuesOf, newCell, newEntry, newEvent, newItem, newStCell, statusCount, stTitle, stValues, ticketsOf,
   type EntryKind, type FCell, type FEntry, type FEvent, type FItem, type Feature, type FTicket, type Status
 } from "../domain/feature";
@@ -320,7 +320,7 @@ function ItemView({ it, screen, path, n, handle, onDelete }: { it: FItem; screen
   );
 }
 
-/* 切り分けと実施状況: チェック・ロジック1つにつき1枚、画面1つにつき「画面の作成」1枚のカード(タイトル、実施状況) */
+/* 切り分けと実施状況: チェック・ロジック1つにつき1枚、イベントのエラーハンドリング1枚のカード(タイトル、実施状況) */
 function SplitEditor({ f }: { f: Feature }) {
   const cells = cellsOf(f);
   const c = statusCount(cells);
@@ -333,7 +333,7 @@ function SplitEditor({ f }: { f: Feature }) {
   };
   const restore = (path: Path, cell: FCell | undefined) => setF(path, { ...(cell || newCell()), on: true }, false);
   return <>
-    <p className="hint">イベントごとに、{FRONT}（画面のとき）と{ERR}を1枚ずつ、BE はチェック・ロジック1つにつき1枚、チケットにします。カード1枚が1チケットです。ほかのチケットで扱うものは × で外せます。</p>
+    <p className="hint">チェック・ロジック1つにつき1枚（「〇〇の△△処理の実装」）、{ERR}はイベントに1枚、チケットにします。カード1枚が1チケットです。ほかのチケットで扱うものは × で外せます。</p>
     <div className="status-sum">
       <span>チケット{cells.length}件</span>
       {STATUSES.map(s => <span key={s} className={"st-pill st-" + STATUSES.indexOf(s)}>{s} {c[s]}</span>)}
@@ -347,8 +347,7 @@ function SplitEditor({ f }: { f: Feature }) {
           const mine = tks.filter(x => x.event === ev);
           const at = (...p: (string | number)[]): Path => ["entries", i, "events", j, ...p];
           const offs: { label: string; path: Path; cell?: FCell }[] = [];
-          if (e.kind === "screen" && !(ev.cells && ev.cells.front && ev.cells.front.on)) offs.push({ label: FRONT, path: at("cells", "front"), cell: ev.cells && ev.cells.front });
-          ev.items.forEach((it, n) => { if ((it.layer === "be" || e.kind !== "screen") && !(it.cell && it.cell.on)) offs.push({ label: "BE：" + (it.name.trim() || ITEM_KINDS[it.kind]), path: at("items", n, "cell"), cell: it.cell }); });
+          ev.items.forEach((it, n) => { if (!(it.cell && it.cell.on)) offs.push({ label: LAYERS[layerOf(e, it)] + "：" + (it.name.trim() || ITEM_KINDS[it.kind]), path: at("items", n, "cell"), cell: it.cell }); });
           if (!(ev.cells && ev.cells.err && ev.cells.err.on)) offs.push({ label: ERR, path: at("cells", "err"), cell: ev.cells && ev.cells.err });
           return (
             <div key={ev._k} className="split-event">
@@ -405,7 +404,7 @@ function Cell({ tk, docMissing }: { f: Feature; tk: FTicket; docMissing: (id: st
   const { cell, path } = tk;
   const m = cell.docId ? docMissing(cell.docId) : null;
   const content = contentOf(tk);
-  const name = tk.kind === "front" ? FRONT : tk.kind === "err" ? ERR : "BE：" + (tk.item!.name.trim() || ITEM_KINDS[tk.item!.kind]);
+  const name = tk.kind === "err" ? ERR : tk.lname + "：" + (tk.item!.name.trim() || ITEM_KINDS[tk.item!.kind]);
   return (
     <div className={"cell st-b" + STATUSES.indexOf(cell.status || "未着手")}>
       <div className="cell-head">
@@ -419,7 +418,7 @@ function Cell({ tk, docMissing }: { f: Feature; tk: FTicket; docMissing: (id: st
         {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
       {content.length > 0 ? <ul className="cell-items">{content.map((x, i) => <li key={i}>{x}</li>)}</ul>
-        : <span className="meta">{tk.kind === "err" ? "エラーハンドリングありのチェック・ロジックはありません" : "チェック・ロジックはありません"}</span>}
+        : tk.kind === "err" && <span className="meta">エラーハンドリングありのチェック・ロジックはありません</span>}
       {cell.docId && m != null
         ? <button type="button" className="link small" onClick={() => openDoc(cell.docId!)}>チケット本文を開く（{m ? "未記入" + m + "件" : "記入済み"}）</button>
         : <button type="button" className="link small" onClick={() => createDoc(tk)}>チケット本文を作る</button>}
@@ -469,7 +468,7 @@ export function FeatureWelcome() {
   return (
     <section className="card welcome">
       <h2>チケットを切り分ける</h2>
-      <p className="hint">フィーチャーを実装するのに必要なチケットを、漏れなくダブりなく切り分けます。画面を足すとイベントが入り、イベントごとに CLIENT・BFF とエラーハンドリングのチケット、BE はチェック・ロジック1つにつき1枚のチケットができます。実施状況を付けて、Excelに書き出して共有できます。</p>
+      <p className="hint">フィーチャーを実装するのに必要なチケットを、漏れなくダブりなく切り分けます。画面を足すとイベントが入り、チェック・ロジック1つにつき1枚（「初期表示の住所取得処理の実装」など）と、イベントごとにエラーハンドリングのチケットができます。実施状況を付けて、Excelに書き出して共有できます。</p>
       <button type="button" className="primary" onClick={createFeature}>＋ 切り分けを始める</button>
     </section>
   );
