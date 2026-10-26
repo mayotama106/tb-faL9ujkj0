@@ -50,6 +50,7 @@ export function LocalMenu({ extra }: { extra?: { label: string; onClick: () => v
       </button>
       {open && (
         <div className="local-pop" role="menu">
+          <p className="hint build">この版：{typeof __BUILD__ === "string" ? __BUILD__ : "-"}{isLocal ? "（ダウンロード版）" : ""}</p>
           {extra && <button type="button" className="plain narrow-only" role="menuitem" onClick={() => { setOpen(false); extra.onClick(); }}>{extra.label}</button>}
           {!isLocal && <>
             <a className="primary small" role="menuitem" href="./ticket-builder.html" download="ticket-builder.html" onClick={() => setOpen(false)}>アプリをダウンロード</a>
