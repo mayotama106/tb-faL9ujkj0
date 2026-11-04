@@ -2,7 +2,7 @@
    必要なチケットを漏れなくダブりなく決め、実施状況を追い、Excelに書き出す */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ENTRY_KINDS, ERR, EXCEL_HEADER, ITEM_KINDS, LAYERS, LAYER_KEYS, layerOf, STATUSES, buildFeature, contentOf, docValues,
+  ENTRY_KINDS, ERR, EXCEL_HEADER, ITEM_KINDS, LAYERS, LAYER_KEYS, layerOf, STATUSES, buildFeature, contentOf, docGenre, docValues,
   cellsOf, entryLabel, excelRows, issuesOf, newCell, newEntry, newEvent, newItem, newStCell, statusCount, stTitle, stValues, ticketsOf,
   type EntryKind, type FCell, type FEntry, type FEvent, type FItem, type Feature, type FTicket, type Status
 } from "../domain/feature";
@@ -63,7 +63,7 @@ function createDoc(tk: FTicket) {
   const v = docValues(f, tk, newId);
   ensureKeys(v);
   const now = Date.now();
-  const doc: Doc = { id: newId(), genre: "impl", v, createdAt: now, updatedAt: now };
+  const doc: Doc = { id: newId(), genre: docGenre(tk), v, createdAt: now, updatedAt: now };
   update(d => {
     d.docs.unshift(doc);
     const ff = d.features.find(x => x.id === f.id);

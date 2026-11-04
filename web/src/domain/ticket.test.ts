@@ -56,8 +56,8 @@ function randomValues(genre: string, r: () => number): Values {
 }
 
 describe("buildTicket は旧版と同じく未記入を数える", () => {
-  /* 実装チケットとSTチケットは旧版にないので、impl.test.ts と st.test.ts で確かめる */
-  for (const genre of Object.keys(GENRES).filter(k => !GENRES[k].impl && !GENRES[k].st && !GENRES[k].call)) {
+  /* 実装・API呼び出し・STチケット・エラーハンドリングチケットは旧版にないので、それぞれのテストで確かめる */
+  for (const genre of Object.keys(GENRES).filter(k => !GENRES[k].impl && !GENRES[k].st && !GENRES[k].call && k !== "err")) {
     it(genre, () => {
       const r = rng(genre.length * 7919);
       expect(buildTicket(GENRES[genre], {}).missing).toBe(legacy({ genre, v: {} }).missing);
@@ -70,6 +70,26 @@ describe("buildTicket は旧版と同じく未記入を数える", () => {
       }
     });
   }
+});
+
+describe("エラーハンドリングチケットの書式", () => {
+  it("エラーになる場合、エラー時の挙動、受け入れ条件の順に出す", () => {
+    const v: Values = {
+      title: "t", story: "住所変更ボタン押下時のエラーハンドリングを実装する", e_target: "住所変更画面 / 住所変更ボタン押下",
+      e_cases: ["郵便番号が7桁でない場合（郵便番号チェック）"], e_detect: "APIのレスポンスが400",
+      e_notify_kind: "エラーモーダル", e_notify_eid: "E001", e_notify_emsg: "郵便番号を確認してください", e_notify_elog: "WARN",
+      e_state: "入力値を保持する", e_retry: "できる", e_retry_how: "入力し直して再度押下する",
+      e_check: ["6桁で送信するとエラーモーダルが出る"], e_test: "追加する", e_test_what: "郵便番号6桁のケース", deps: "なし", refs: "設計書"
+    };
+    const r = buildTicket(GENRES.err, v);
+    expect(r.missing).toBe(0);
+    expect(r.text).toContain("## エラーになる場合\n\n* 対象の処理：住所変更画面 / 住所変更ボタン押下\n* エラーになる場合\n   * 郵便番号が7桁でない場合（郵便番号チェック）\n* 検知の方法：APIのレスポンスが400");
+    expect(r.text).toContain("## エラー時の挙動\n\n* 利用者への通知：エラーモーダル\n   * エラーID：E001");
+    expect(r.text).toContain("* やり直し：できる\n   * やり直しの方法：入力し直して再度押下する");
+    expect(r.text).not.toContain("監視・アラート");
+    expect(r.text).toContain("## 受け入れ条件\n\n* エラーになる場合に、エラー時の挙動のとおりに処理されること");
+    expect(buildTicket(GENRES.err, {}).missing).toBeGreaterThan(0);
+  });
 });
 
 describe("バグチケットの書式", () => {

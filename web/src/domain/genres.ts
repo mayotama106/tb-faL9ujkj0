@@ -46,6 +46,7 @@ export interface Genre {
   modOnly?: QNode[];
   storyLabel?: string;
   storyHint?: string;
+  storyPh?: string;
   sections?: Section[];
   heads?: Partial<Heads>;
   impl?: boolean;   /* 実装チケット。部品を組み合わせて作り、観点表(func など)を持たない */
@@ -75,6 +76,34 @@ export const GENRES: Record<string, Genre> = {
     name: "API呼び出しチケット",
     call: true
   },
+  /* エラーハンドリングの実装。どの処理の、どんな場合に、どう扱うかを問う。節の構成はバグチケットと同じ形式 */
+  err: {
+    name: "エラーハンドリングチケット",
+    storyLabel: "概要",
+    storyHint: "どの処理のエラーハンドリングか、一言で",
+    storyPh: "例: 住所変更ボタン押下時の処理で、エラーになる場合のエラーハンドリングを実装する",
+    sections: [
+      { key: "case", title: "エラーになる場合", nodes: [
+        q("e_target", "どの処理のエラーハンドリング？", "対象の処理", { ph: "例: 住所変更画面 / 住所変更ボタン押下" }),
+        list("e_cases", "どんな場合にエラーになる？(1つずつ)", "エラーになる場合", "例: 郵便番号が7桁でない場合（郵便番号チェック）"),
+        q("e_detect", "エラーをどう検知する？(例外、ステータスコード、戻り値など)", "検知の方法")
+      ] },
+      { key: "act", title: "エラー時の挙動", nodes: [
+        { id: "e_notify", q: "利用者にどう知らせる？", label: "利用者への通知", type: "error" },
+        q("e_state", "エラーのあと、データと画面はどうなる？(ロールバック、入力値の保持など)", "エラー後の状態"),
+        { id: "e_retry", q: "利用者はやり直せる？", label: "やり直し", type: "choice", options: ["できる", "できない"],
+          branches: { "できる": [q("e_retry_how", "どうやり直す？", "やり直しの方法")] } },
+        q("e_alert", "監視・アラートは？(任意)", "監視・アラート", { optional: true })
+      ] },
+      { key: "ac", title: "受け入れ条件", lead: "エラーになる場合に、エラー時の挙動のとおりに処理されること", nodes: [
+        list("e_check", "確認することは？", "確認項目", "例: 郵便番号を6桁で送信すると、エラーメッセージが表示される"),
+        { id: "e_test", q: "異常系のテストは追加する？", label: "異常系のテスト", type: "choice",
+          options: ["追加する", "追加しない"], shown: { "追加する": "あり", "追加しない": "なし" },
+          branches: { "追加する": [q("e_test_what", "どのテストを追加する？", "追加するテスト")],
+                      "追加しない": [q("e_test_why", "追加しない理由は？", "追加しない理由")] } }
+      ] }
+    ]
+  },
   st: {
     name: "STチケット",
     st: true
@@ -84,6 +113,7 @@ export const GENRES: Record<string, Genre> = {
     name: "バグチケット",
     storyLabel: "概要",
     storyHint: "どんな不具合か、一言で",
+    storyPh: "例: 住所2を空にして住所を変更すると、500エラーになる",
     sections: [
       { key: "sym", title: "事象", nodes: [
         q("b_what", "何が起きている？", "事象"),

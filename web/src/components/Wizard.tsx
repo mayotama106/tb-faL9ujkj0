@@ -62,7 +62,7 @@ function PartBody({ doc, g, part, parts, ticket, missingOf }: {
       <Field path={["title"]} label="タイトル(Jiraの要約欄に入れる)" />
       {g.sections && <FeaturePick kind="impl" optional />}
       <Field path={["story"]} label={g.sections ? (g.storyLabel || "概要") + "は？" + (g.storyHint ? "(" + g.storyHint + ")" : "") : headsOf(g).story}
-        ph={g.sections ? "例: 住所2を空にして住所を変更すると、500エラーになる" : "誰が、何を、なぜ必要としているか"} />
+        ph={g.sections ? g.storyPh : "誰が、何を、なぜ必要としているか"} />
     </>;
     case "kind": return <>
       <Field path={["api_name"]} label={g.noun + "の名前は？"} ph={g.example} />

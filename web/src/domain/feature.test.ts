@@ -1,7 +1,7 @@
 /* チケットの切り分け: 画面・処理 → イベント → チェック・ロジック。チェック・ロジック1つにつき1チケット、エラーハンドリングはイベントに1チケット */
 import { describe, expect, it } from "vitest";
 import {
-  buildFeature, cellsOf, compOf, contentOf, docValues, entryLabel, errWhen, eventCells, excelRows, EXCEL_HEADER, issuesOf, migrateFeature, newCell, newEntry, newItem,
+  buildFeature, cellsOf, compOf, contentOf, docGenre, docValues, entryLabel, errWhen, eventCells, excelRows, EXCEL_HEADER, issuesOf, migrateFeature, newCell, newEntry, newItem,
   newStCell, partOf, relinkDocs, statusCount, stValues, ticketsOf, trigOf, type Feature, type FItem
 } from "./feature";
 import { GENRES } from "./genres";
@@ -143,11 +143,15 @@ describe("切り分けから作るチケット本文", () => {
     expect(text).not.toContain("* イベント");
     expect(text).toContain("* 閲覧権限のチェックが行われていること\n   * 処理の流れ\n      1. 閲覧権限のチェック");
   });
-  it("エラーハンドリングのチケット: ありのものを1つずつエラーハンドリングの部品にする", () => {
+  it("エラーハンドリングのチケット: エラーハンドリングチケットで作り、ありのものを「エラーになる場合」に入れる", () => {
     const f = base();
-    const text = buildTicket(GENRES.impl, docValues(f, tk(f, "【エラーハンドリング】書類提出画面 保存ボタン押下"), key)).text;
-    expect(text).toContain("* 保存ボタン押下処理のエラーハンドリングが行われていること\n   * 拡張子が.pdfでない場合（ファイル形式チェック）");
-    expect(text).toContain("   * 書類の情報を登録でエラーになる場合");
+    const t0 = tk(f, "【エラーハンドリング】書類提出画面 保存ボタン押下");
+    expect(docGenre(t0)).toBe("err");
+    expect(docGenre(tk(f, "【BE】書類提出画面 保存ボタン押下の書類の情報を登録処理の実装"))).toBe("impl");
+    const text = buildTicket(GENRES.err, docValues(f, t0, key)).text;
+    expect(text).toContain("* 対象：書類提出画面 / 保存ボタン押下 / エラーハンドリング");
+    expect(text).toContain("## 概要\n\n* 保存ボタン押下処理で、エラーになる場合のエラーハンドリングを実装する");
+    expect(text).toContain("* 対象の処理：書類提出画面 / 保存ボタン押下\n* エラーになる場合\n   * 拡張子が.pdfでない場合（ファイル形式チェック）\n   * 書類の情報を登録でエラーになる場合");
   });
   it("エラーの「どんな場合？」と、きっかけの決め方、部品の選び方", () => {
     expect(errWhen({ _k: "i", kind: "check", name: "必須チェック", layer: "be", errNote: "未入力の項目がある" })).toBe("未入力の項目がある場合（必須チェック）");

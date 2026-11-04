@@ -168,16 +168,23 @@ export function statusCount(cells: FCell[]): Record<Status, number> {
   return c;
 }
 
-/* チケットから、チケットビルダーの実装チケットの入力値を作る。チェック・ロジックを部品にして入れておく。
-   CLIENT・BFF は画面作成の部品のイベント(初期表示なら初期表示)に入れる。BE はそのチェック・ロジック1つ。
-   エラーハンドリングは、ありのものを1つずつエラーハンドリングの部品にする */
+/* チケット本文のジャンル。エラーハンドリングはエラーハンドリングチケット、ほかは実装チケット */
+export const docGenre = (tk: FTicket) => (tk.kind === "err" ? "err" : "impl");
+
+/* チケットから、チケットビルダーのチケットの入力値を作る。
+   実装チケット: チェック・ロジックを部品にして入れておく。CLIENT・BFF は画面作成の部品のイベント(初期表示なら初期表示)に入れる。BE はそのチェック・ロジック1つ。
+   エラーハンドリングチケット: 対象の処理と、エラーハンドリングありのものを「エラーになる場合」に入れておく */
 export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
+  const feat = { title: tk.title, feat_title: tk.title, feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk) };
+  if (tk.kind === "err") {
+    const ev = t(tk.event.name) || MISSING;
+    return { ...feat, story: ev + "処理で、エラーになる場合のエラーハンドリングを実装する",
+      e_target: entryLabel(tk.entry) + " / " + ev, e_cases: tk.items.map(errWhen) };
+  }
   const steps: Values[] = [];
   let checks: Values | null = null;
   tk.items.forEach(it => {
-    if (tk.kind === "err") {
-      steps.push({ ...newBlock(COMPONENTS.error, key), when: errWhen(it), err: {} });
-    } else if (it.kind === "check") {
+    if (it.kind === "check") {
       if (!checks) { checks = { ...newBlock(COMPONENTS.check, key), name: "", items: [] }; steps.push(checks); }
       (checks.items as Values[]).push({ _k: key(), name: t(it.name), detail: "", err: {} });
     } else {
@@ -189,9 +196,9 @@ export function docValues(f: Feature, tk: FTicket, key: () => string): Values {
     const c = checks as Values, items = c.items as Values[];
     c.name = items.length === 1 ? items[0].name : (t(tk.event.name) || MISSING) + "時のチェック";
   }
-  const base = { _impl: 1, title: tk.title, feat_title: tk.title, story_goal: t(f.goal), feat_name: t(f.name), feat_part: partOf(tk), feat_ref: refOf(f, tk) };
+  const base = { _impl: 1, ...feat, story_goal: t(f.goal) };
   /* 画面の CLIENT・BFF は画面作成の部品に入れる。画面全体の仕様は画面の最初の CLIENT・BFF のチケットで書き、ほかでは任意にする */
-  if (tk.kind !== "err" && tk.entry.kind === "screen" && tk.lname === FRONT) {
+  if (tk.entry.kind === "screen" && tk.lname === FRONT) {
     const firstFront = ticketsOf(f).find(x => x.entry === tk.entry && x.kind !== "err" && x.lname === FRONT);
     const first = !!firstFront && firstFront.cell === tk.cell;
     const init = t(tk.event.name) === ENTRY_KINDS.screen.first;
