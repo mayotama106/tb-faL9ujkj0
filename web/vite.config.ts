@@ -10,5 +10,7 @@ const BUILD = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCD
 export default defineConfig({
   base: "./",
   define: { __BUILD__: JSON.stringify(BUILD) },
+  /* 配布する Excel(src/assets)を、?inline でデータURLとして埋め込めるようにする */
+  assetsInclude: ["**/*.xlsx"],
   plugins: [react()],
 });

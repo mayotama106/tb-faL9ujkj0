@@ -1,5 +1,6 @@
-/* ローカルで使うためのメニュー: アプリ(1ファイル)のダウンロード、データの書き出し・読み込み */
+/* ローカルで使うためのメニュー: アプリ(1ファイル)と配布物のダウンロード、データの書き出し・読み込み */
 import { useEffect, useRef, useState } from "react";
+import trustSheet from "../assets/trust-management-sheet.xlsx?inline";
 import { exportData, importData } from "../state/persist";
 import { toast } from "../state/store";
 
@@ -56,6 +57,8 @@ export function LocalMenu({ extra }: { extra?: { label: string; onClick: () => v
             <a className="primary small" role="menuitem" href="./ticket-builder.html" download="ticket-builder.html" onClick={() => setOpen(false)}>アプリをダウンロード</a>
             <p className="hint">1つのHTMLファイルです。ダブルクリックでブラウザで開けます（ネット接続なしで動きます）。</p>
           </>}
+          <a className="plain" role="menuitem" href={trustSheet} download="trust-management-sheet.xlsx" onClick={() => setOpen(false)}>信頼構築 管理シートをダウンロード</a>
+          <p className="hint">Excelファイルです。約束台帳・週次ステータス・トリガーログ・月次診断のシートが入っています。</p>
           <button type="button" className="plain" role="menuitem" onClick={exportAll}>すべてのデータを書き出す（移行用）</button>
           <button type="button" className="plain" role="menuitem" onClick={() => file.current?.click()}>すべてのデータを置き換えて読み込む</button>
           <p className="hint">{isLocal ? "公開版とこのファイルは保存先が別です。公開版で書き出したデータを読み込むと、続きから使えます。" : "公開版とローカル版は保存先が別です。ここで書き出して、ローカル版で読み込むと、続きから使えます。"}</p>
