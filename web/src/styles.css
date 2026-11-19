@@ -429,3 +429,22 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
 .kit-title { font-weight: 600; margin: 0 0 8px; overflow-wrap: anywhere; }
 .preview mark { background: #F5E3B8; color: inherit; border-radius: 3px; padding: 0 1px; }
 @media (max-width: 599px) { .kit-fields.two { grid-template-columns: minmax(0, 1fr); } }
+
+/* ===== 部品の中身のエディタ ===== */
+.le { border: 1px solid var(--mist); border-radius: 10px; background: var(--field); font-weight: 400; color: var(--navy); }
+.le-bar { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border-bottom: 1px solid var(--mist); background: rgba(231, 226, 217, 0.5); border-radius: 10px 10px 0 0; }
+.le-btn { font: inherit; font-size: 12px; padding: 3px 8px; border: 1px solid var(--mist); border-radius: 6px; background: #fff; color: var(--navy); cursor: pointer; }
+.le-btn.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+.le-lines { padding: 8px 10px; }
+.le-line { position: relative; display: flex; }
+.le-line textarea { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; resize: none; overflow: hidden; font: inherit; color: inherit; padding: 2px 0; line-height: 1.6; outline: none; }
+.le-line textarea:focus { background: rgba(161, 178, 214, 0.15); border-radius: 4px; }
+.le-mark { position: absolute; width: 20px; margin-left: -22px; text-align: right; padding-top: 2px; line-height: 1.6; color: var(--muted); font-size: 14px; }
+.le-line.k-h1 textarea { font-size: 22px; font-weight: 700; margin-top: 6px; }
+.le-line.k-h2 textarea { font-size: 18px; font-weight: 700; margin-top: 6px; }
+.le-line.k-h3 textarea { font-size: 16px; font-weight: 700; margin-top: 4px; }
+.le-line.k-h4 textarea { font-size: 15px; font-weight: 700; color: var(--blue); }
+.le-line.k-bullet textarea, .le-line.k-num textarea, .le-line.k-text textarea { font-size: 14px; }
+.le-line.k-table textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.le-raw { width: 100%; box-sizing: border-box; border: 0; background: transparent; padding: 8px 10px; resize: vertical; font-size: 13px; }
+.le-help { margin: 0; padding: 4px 10px 6px; font-size: 11px; color: var(--muted); border-top: 1px dashed var(--mist); }

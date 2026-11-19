@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { KIT_CATS, KIT_GENRES, assemble, defaultKit, holesOf, insertIndex, partsOf, usedBy, type KPart, type KTpl } from "../domain/kit";
 import { getState, newId, setUI, toast, update, useStore } from "../state/store";
 import { AutoText } from "./Fields";
+import { LineEditor } from "./LineEditor";
 import { SortableList, move } from "./Sortable";
 import { CopyButton } from "./Wizard";
 
@@ -27,9 +28,16 @@ const editTpl = (id: string, fn: (t: KTpl) => void, coalesce?: string) =>
 const editPart = (id: string, fn: (p: KPart) => void, coalesce?: string) =>
   update(d => { const p = d.kit.parts.find(x => x.id === id); if (p) fn(p); }, { coalesce: coalesce && "kitp:" + id + ":" + coalesce });
 
+/* 次に開くテンプレートで、はじめから開いておく部品(新しく作ったとき) */
+let openNext: string | null = null;
+/* 新しいテンプレートは、自分で書く部品「本文」を1つ持って始め、その中身を開いておく */
 function newTpl(genre: string) {
-  const id = newId();
-  update(d => { d.kit.tpls.unshift({ id, genre, name: "新しいテンプレート", desc: "", title: "", parts: [], opt: [] }); });
+  const id = newId(), pid = newId();
+  update(d => {
+    d.kit.parts.push({ id: pid, cat: "基本", name: "本文（新しいテンプレート）", body: "## 概要\n\n* 【〇〇】" });
+    d.kit.tpls.unshift({ id, genre, name: "新しいテンプレート", desc: "", title: "", parts: [pid], opt: [] });
+  });
+  openNext = pid + "#0";
   setUI({ kitTab: "tpls", kitId: id, sidebar: false });
 }
 function dupTpl(t: KTpl) {
@@ -160,7 +168,7 @@ export function KitSidebar() {
 export function KitComposer({ t }: { t: KTpl }) {
   const kit = useKit();
   const off = useOff(t);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(() => { const o = openNext; openNext = null; return o; });
   const [adding, setAdding] = useState(false);
   const ids = t.parts.map((id, i) => id + "#" + i);
   return <>
@@ -250,9 +258,9 @@ function PartBody({ p }: { p: KPart }) {
           <datalist id="kit-cats">{KIT_CATS.map(c => <option key={c} value={c} />)}</datalist>
         </label>
       </div>
-      <label className="kit-text">中身（埋める所は【〇〇】）
-        <AutoText id={"kp_body_" + p.id} className="mono" value={p.body} label="部品の中身" onChange={s => editPart(p.id, x => { x.body = s; }, "body")} />
-      </label>
+      <div className="kit-text">中身（埋める所は【〇〇】）
+        <LineEditor key={p.id} id={"kp_body_" + p.id} value={p.body} label="部品の中身" onChange={s => editPart(p.id, x => { x.body = s; }, "body")} />
+      </div>
       <p className="hint">{n > 1 ? "この部品は" + n + "件のテンプレートで使っています。直すと、すべてに反映されます。" : "この部品を使っているのは、このテンプレートだけです。"}</p>
     </div>
   );
