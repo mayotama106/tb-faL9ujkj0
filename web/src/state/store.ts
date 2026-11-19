@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 import { COMPONENTS, type CompDef } from "../domain/components";
 import { GENRES, type Genre } from "../domain/genres";
 import type { Feature } from "../domain/feature";
+import type { Kit } from "../domain/kit";
 import type { Values } from "../domain/ticket";
 import { loadInitial, persist } from "./persist";
 
@@ -15,6 +16,7 @@ export interface Data {
   templates: Record<string, Genre>;   /* 編集したテンプレート。初期状態と同じジャンルは持たない */
   comps: Record<string, CompDef>;     /* 編集した部品の定義。初期の定義と同じ部品は持たない */
   features: Feature[];                /* フィーチャーの分解 */
+  kit: Kit;                           /* テンプレート集(部品とその組み合わせ) */
 }
 export interface Toast { id: number; text: string; undo: boolean }
 export interface UI {
@@ -28,10 +30,16 @@ export interface UI {
   filter: string;
   sidebar: boolean;               /* 狭い画面でのチケット一覧の表示 */
   toast: Toast | null;
-  view: "tickets" | "features";   /* チケット(ビルダー)とフィーチャー(分解)の切り替え */
+  view: View;                     /* テンプレート(ホーム)、チケット(ビルダー)、切り分けの切り替え */
   featureId: string | null;
   featurePart: Record<string, string>;
+  kitId: string | null;           /* 開いているテンプレート */
+  kitTab: "tpls" | "parts";       /* テンプレートの一覧と、部品の一覧の切り替え */
+  kitPart: string | null;         /* 部品の一覧で開いている部品 */
+  kitQuery: string;
+  kitOff: Record<string, string[]>;   /* テンプレートごとの、オフにした部品(はじめは opt の部品) */
 }
+export type View = "kit" | "tickets" | "features";
 export interface State { data: Data; ui: UI; past: Data[]; future: Data[] }
 
 const init = loadInitial();
@@ -40,7 +48,8 @@ let state: State = {
   ui: {
     currentId: init.currentId, part: {}, collapsed: init.collapsed, openEtc: [], editing: false,
     editGenre: "impl", query: "", filter: "", sidebar: false, toast: null,
-    view: init.view, featureId: init.featureId, featurePart: {}
+    view: init.view, featureId: init.featureId, featurePart: {},
+    kitId: init.data.kit.tpls[0] ? init.data.kit.tpls[0].id : null, kitTab: "tpls", kitPart: null, kitQuery: "", kitOff: {}
   },
   past: [], future: []
 };

@@ -101,11 +101,11 @@ function GenreEditor({ genre }: { genre: string }) {
   return (
     <>
       <section className="card">
-        <h2>{g.name}のテンプレート{edited && <span className="tag">編集済み</span>}</h2>
+        <h2>{g.name}の観点表{edited && <span className="tag">編集済み</span>}</h2>
         <p className="hint">ここでの変更は、このブラウザ内にだけ保存され、すぐに全チケットへ反映されます。入力済みの内容は消えません。問いは ⋮⋮ を持って並べ替えられます。</p>
         <button type="button" className="plain" disabled={!edited} onClick={() => {
           update(d => { delete d.templates[genre]; });
-          toast(g.name + "のテンプレートを初期状態に戻しました", true);
+          toast(g.name + "の観点表を初期状態に戻しました", true);
         }}>このジャンルを初期状態に戻す</button>
       </section>
       <section className="card">

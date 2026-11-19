@@ -2,9 +2,10 @@
 import { COMPONENTS, type CompDef } from "../domain/components";
 import { migrateFeature, relinkDocs, type Feature } from "../domain/feature";
 import { GENRES, type Genre } from "../domain/genres";
+import { defaultKit, normalizeKit } from "../domain/kit";
 import { OLD_IMPL_GENRES, toImpl, upgradeImpl } from "./migrateImpl";
 import type { Values } from "../domain/ticket";
-import type { Data, Doc, State } from "./store";
+import type { Data, Doc, State, View } from "./store";
 
 const KEY = "ticket-builder:v2";
 /* 旧版のキー。読むだけで、書き換えも削除もしない(旧版に戻した場合にそのまま使える) */
@@ -14,11 +15,13 @@ const V1_SAVED_KEY = "ticket-builder:saved:v1";
 const TPL_KEY = "ticket-builder:templates:v1";
 /* 部品の編集済みの定義。初期の定義と異なる部品だけを持つ */
 const COMP_KEY = "ticket-builder:components:v1";
+/* テンプレート集(部品と組み合わせ)。編集したものだけでなく、全体を持つ */
+const KIT_KEY = "ticket-builder:kit:v1";
 /* 実装チケットに移す前の内容の控え */
 const BACKUP_KEY = "ticket-builder:v2:before-impl";
 const known = (g: string) => !!GENRES[g] || OLD_IMPL_GENRES.includes(g);
 
-interface Stored { docs: Doc[]; currentId: string | null; collapsed: string[]; features?: Feature[]; featureId?: string | null; view?: "tickets" | "features" }
+interface Stored { docs: Doc[]; currentId: string | null; collapsed: string[]; features?: Feature[]; featureId?: string | null; view?: View }
 
 function read<T>(key: string): T | null {
   try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
@@ -78,7 +81,7 @@ function migrateV1(): Stored {
   return { docs, currentId: currentId || (docs[0] ? docs[0].id : null), collapsed: (v1 && v1.c) || [] };
 }
 
-export function loadInitial(): { data: Data; currentId: string | null; collapsed: string[]; featureId: string | null; view: "tickets" | "features" } {
+export function loadInitial(): { data: Data; currentId: string | null; collapsed: string[]; featureId: string | null; view: View } {
   const stored = read<Stored>(KEY) || migrateV1();
   const docs = (stored.docs || []).filter(d => known(d.genre));
   /* 旧形式の API作成・画面作成・ロジック作成は、実装チケットに移す。移す前の内容は控えに残す */
@@ -97,10 +100,12 @@ export function loadInitial(): { data: Data; currentId: string | null; collapsed
   const features = Array.isArray(stored.features) ? stored.features.map(migrateFeature) : [];
   relinkDocs(features, docs);
   const featureId = features.some(f => f.id === stored.featureId) ? stored.featureId || null : (features[0] ? features[0].id : null);
-  return { data: { docs, templates, comps, features }, currentId, collapsed: stored.collapsed || [], featureId, view: stored.view === "features" ? "features" : "tickets" };
+  const kit = normalizeKit(read(KIT_KEY)) || defaultKit();
+  /* 開いたときは、いつもホーム(テンプレート)から */
+  return { data: { docs, templates, comps, features, kit }, currentId, collapsed: stored.collapsed || [], featureId, view: "kit" };
 }
 
-let lastTpl = "", lastComp = "";
+let lastTpl = "", lastComp = "", lastKit = "";
 export function persist(s: State) {
   try {
     const stored: Stored = { docs: s.data.docs, currentId: s.ui.currentId, collapsed: s.ui.collapsed, features: s.data.features, featureId: s.ui.featureId, view: s.ui.view };
@@ -109,11 +114,13 @@ export function persist(s: State) {
     if (tpl !== lastTpl) { localStorage.setItem(TPL_KEY, tpl); lastTpl = tpl; }
     const comp = JSON.stringify(s.data.comps);
     if (comp !== lastComp) { localStorage.setItem(COMP_KEY, comp); lastComp = comp; }
+    const kit = JSON.stringify(s.data.kit);
+    if (kit !== lastKit) { localStorage.setItem(KIT_KEY, kit); lastKit = kit; }
   } catch { /* 保存領域が使えない環境では保存なしで動く */ }
 }
 
 /* ===== データの持ち運び(公開版とローカル版はブラウザの保存先が別なので、ファイルで移す) ===== */
-const MOVE_KEYS = [KEY, TPL_KEY, COMP_KEY];
+const MOVE_KEYS = [KEY, TPL_KEY, COMP_KEY, KIT_KEY];
 export function exportData(): string {
   const items: Record<string, string> = {};
   MOVE_KEYS.forEach(k => { try { const v = localStorage.getItem(k); if (v != null) items[k] = v; } catch { /* 何もしない */ } });

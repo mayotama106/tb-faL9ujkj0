@@ -67,6 +67,10 @@ button:disabled { cursor: default; }
   .top { gap: 6px; padding: 0 10px; }
   .lbl { display: none; }
   .menu { padding: 5px 12px; }
+  .top .hbtn { padding: 5px 7px; font-size: 12px; }
+  .top .menu { padding: 5px 9px; }
+  .views { gap: 2px; }
+  .kit-on .tag { display: none; }
   .card.part { padding: 18px 16px; }
 }
 
@@ -400,3 +404,28 @@ textarea:focus, input:focus, button:focus-visible { outline: 2px solid var(--blu
 .conflicts { list-style: none; padding: 0; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
 .conflicts li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; padding: 8px 10px; border: 1px solid var(--mist); border-radius: 10px; background: var(--field); }
 .conflicts .t { font-weight: 600; font-size: 14px; }
+
+/* ===== テンプレート(ホーム) ===== */
+.kit-list h3 { margin: 14px 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+.kit-fields { display: grid; gap: 10px; }
+.kit-fields.two { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.kit-fields label, .kit-text { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.kit-fields select, .kit-fields input { min-width: 0; width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid var(--mist); border-radius: 8px; background: #fff; color: inherit; }
+.card h2 .meta { font-size: 12px; font-weight: 400; color: var(--muted); }
+.kit-part { background: rgba(244, 242, 236, 0.7); border: 1px solid var(--mist); border-radius: 10px; padding: 6px 8px; margin-bottom: 6px; }
+.kit-part .row { align-items: center; margin: 0; }
+.kit-part.off .t { color: var(--muted); text-decoration: line-through; }
+.kit-on { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+.kit-on .t { overflow-wrap: anywhere; }
+.kit-on .tag { font-size: 11px; color: var(--blue); border: 1px solid var(--mist); border-radius: 999px; padding: 0 8px; white-space: nowrap; }
+.kit-on .opt { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.kit-body { margin: 8px 0 4px; display: grid; gap: 8px; }
+.kit-body textarea.mono, .kit-text textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.kit-add { margin-top: 10px; }
+.kit-picker { margin-top: 10px; border-top: 1px dashed var(--mist); padding-top: 10px; }
+.kit-pick-group { margin-top: 8px; }
+.kit-pick-group .q, .kit-used .q { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+.kit-used { margin-top: 12px; }
+.kit-title { font-weight: 600; margin: 0 0 8px; overflow-wrap: anywhere; }
+.preview mark { background: #F5E3B8; color: inherit; border-radius: 3px; padding: 0 1px; }
+@media (max-width: 599px) { .kit-fields.two { grid-template-columns: minmax(0, 1fr); } }

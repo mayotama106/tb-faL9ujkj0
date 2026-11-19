@@ -43,7 +43,7 @@ export function ImplPart({ g, partKey }: { g: Genre; partKey: string }) {
       const groups = collectAc(defs, v);
       return <>
         <CodeLists />
-        <p className="hint">組み立ての部品ごとに自動で作ります（部品1つにつき1件。その下に、エラーハンドリングと「〇〇場合」が並びます）。エラーの内容はここでまとめて記入できます（部品の側と同じ値です）。文言は「テンプレートを編集」から部品ごとに変えられます。</p>
+        <p className="hint">組み立ての部品ごとに自動で作ります（部品1つにつき1件。その下に、エラーハンドリングと「〇〇場合」が並びます）。エラーの内容はここでまとめて記入できます（部品の側と同じ値です）。文言は「観点表を編集」から部品ごとに変えられます。</p>
         {groups.length ? (
           <div className="ac-table">
             {groups.map((gr, i) => (

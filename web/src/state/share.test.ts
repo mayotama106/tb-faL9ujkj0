@@ -13,7 +13,7 @@ const feat = (id: string, docId?: string): Feature => ({
     items: [{ _k: "i", kind: "logic", name: "住所を取得", layer: "front", err: "なし", cell: { ...newCell(), docId } }] }] }]
 });
 const data = (): Data => ({ docs: [doc("d1", "画面の実装", { feat_ref: { featureId: "f1", entry: "e", event: "v", layer: "item", item: "i" } }), doc("d2", "別のチケット")],
-  features: [feat("f1", "d1")], templates: {}, comps: {} });
+  features: [feat("f1", "d1")], templates: {}, comps: {}, kit: { parts: [], tpls: [] } });
 
 describe("受け渡し", () => {
   it("切り分けを書き出すと、つながっているチケット本文も入る", () => {
@@ -23,7 +23,7 @@ describe("受け渡し", () => {
   });
   it("同じものがなければ、そのまま足す", () => {
     const p = parsePack(packText(data(), ["d2"], []));
-    const to: Data = { docs: [], features: [], templates: {}, comps: {} };
+    const to: Data = { docs: [], features: [], templates: {}, comps: {}, kit: { parts: [], tpls: [] } };
     expect(conflictsOf(to, p).docs).toEqual([]);
     expect(mergePack(to, p, {}, key)).toEqual({ docs: 1, features: 0 });
     expect(to.docs[0].id).toBe("d2");

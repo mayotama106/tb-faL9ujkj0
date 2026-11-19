@@ -9,6 +9,7 @@ import { TemplateEditor, genreOfSel } from "./components/TemplateEditor";
 import { Wizard } from "./components/Wizard";
 import { LocalMenu } from "./components/LocalMenu";
 import { FeaturePreview, FeatureSidebar, FeatureWelcome, FeatureWizard, useFeature } from "./components/Features";
+import { KitComposer, KitPartEditor, KitPreview, KitSidebar, KitWelcome, useKitPart, useKitTpl } from "./components/Kit";
 
 const EMPTY = {};
 
@@ -23,6 +24,9 @@ export function App() {
   const partKey = useStore(s => (doc && s.ui.part[doc.id]) || "basic");
   const view = useStore(s => s.ui.view);
   const feature = useFeature();
+  const kitTpl = useKitTpl();
+  const kitPart = useKitPart();
+  const kitTab = useStore(s => s.ui.kitTab);
 
   /* Ctrl+Z で取り消し、Ctrl+Shift+Z または Ctrl+Y でやり直し(MacはCommand) */
   useEffect(() => {
@@ -49,9 +53,10 @@ export function App() {
     <header className="top">
       <button type="button" className="menu" aria-expanded={sidebar} onClick={() => setUI({ sidebar: !sidebar })}>☰<span className="lbl"> 一覧</span></button>
       <span className="brand">TICKET BUILDER</span>
-      {/* チケット(本文を作る)と切り分け(フィーチャーをチケットに分ける)の切り替え */}
+      {/* テンプレート(ホーム)、チケット(本文を作る)、切り分け(フィーチャーをチケットに分ける)の切り替え */}
       <div className="views" role="group" aria-label="画面の切り替え">
-        <button type="button" className={view === "tickets" ? "hbtn on" : "hbtn"} aria-pressed={view === "tickets"} onClick={() => setUI({ view: "tickets" })}>チケット</button>
+        <button type="button" className={view === "kit" ? "hbtn on" : "hbtn"} aria-pressed={view === "kit"} onClick={() => setUI({ view: "kit", editing: false })}>テンプレート</button>
+        <button type="button" className={view === "tickets" ? "hbtn on" : "hbtn"} aria-pressed={view === "tickets"} onClick={() => setUI({ view: "tickets" })}>チケット<span className="lbl">作成</span></button>
         <button type="button" className={view === "features" ? "hbtn on" : "hbtn"} aria-pressed={view === "features"} onClick={() => setUI({ view: "features", editing: false })}>切り分け</button>
       </div>
       <span className="spacer" />
@@ -59,11 +64,21 @@ export function App() {
       <button type="button" className="hbtn" disabled={!canRedo} onClick={redo} title="やり直す(Ctrl+Shift+Z)" aria-label="やり直す">↷<span className="lbl"> やり直す</span></button>
       {/* スマホでは、テンプレートの編集はヘッダーのメニュー(⋯)に入れる */}
       {view === "tickets" && <button type="button" className={(editing ? "hbtn on" : "hbtn") + " wide-only"} aria-pressed={editing} onClick={toggleTpl}>
-        {editing ? "編集を終える" : <>テンプレート<span className="lbl">を編集</span></>}
+        {editing ? "編集を終える" : <>観点表<span className="lbl">を編集</span></>}
       </button>}
-      <LocalMenu extra={view === "tickets" ? { label: editing ? "テンプレートの編集を終える" : "テンプレートを編集", onClick: toggleTpl } : undefined} />
+      <LocalMenu extra={view === "tickets" ? { label: editing ? "観点表の編集を終える" : "観点表を編集", onClick: toggleTpl } : undefined} />
     </header>
-    {view === "features" ? <div className="app">
+    {view === "kit" ? <div className="app">
+      <aside className={sidebar ? "sidebar open" : "sidebar"}><KitSidebar /></aside>
+      {sidebar && <div className="scrim" onClick={() => setUI({ sidebar: false })} />}
+      <main className="main">
+        {kitTab === "tpls" ? (kitTpl ? <KitComposer key={kitTpl.id} t={kitTpl} /> : <KitWelcome />)
+          : kitPart ? <KitPartEditor key={kitPart.id} p={kitPart} /> : <KitWelcome parts />}
+      </main>
+      {(kitTab === "tpls" ? kitTpl : kitPart) && <div className="preview-col">
+        {kitTab === "tpls" ? <KitPreview t={kitTpl} /> : <KitPreview p={kitPart} />}
+      </div>}
+    </div> : view === "features" ? <div className="app">
       <aside className={sidebar ? "sidebar open" : "sidebar"}><FeatureSidebar /></aside>
       {sidebar && <div className="scrim" onClick={() => setUI({ sidebar: false })} />}
       <main className="main">{feature ? <FeatureWizard f={feature} /> : <FeatureWelcome />}</main>

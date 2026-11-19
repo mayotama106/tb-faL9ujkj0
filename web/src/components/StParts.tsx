@@ -34,7 +34,7 @@ export function StPart({ g, partKey }: { g: Genre; partKey: string }) {
           <div className="q">実施手順から作る受け入れ条件</div>
           {acs.length ? <ul className="ac-auto">{acs.map((a, i) => <li key={i}>{a}</li>)}</ul>
             : <p className="hint">実施手順に部品を足すと、ここに受け入れ条件ができます。</p>}
-          <p className="hint">文言は「テンプレートを編集」から部品ごとに変えられます。</p>
+          <p className="hint">文言は「観点表を編集」から部品ごとに変えられます。</p>
         </div>
         <div className="node">
           <div className="head"><div className="q">追加の受け入れ条件は？(手順と1対1でないもの)</div><span className="opt">任意</span></div>

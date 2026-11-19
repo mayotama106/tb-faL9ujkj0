@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { GENRES } from "../domain/genres";
 import { buildTicket } from "../domain/ticket";
 import { createDoc, deleteDoc, duplicateDoc, openDoc } from "../state/actions";
-import { defsOf, genreOf, setUI, useStore } from "../state/store";
+import { defsOf, setUI, useStore } from "../state/store";
 import { downloadMd, stamp, titleOf } from "../utils";
 import { ImportButton, exportPack } from "./Share";
 
@@ -17,7 +17,7 @@ export function Sidebar() {
   const [picking, setPicking] = useState(false);
 
   const rows = useMemo(() => docs.map(d => {
-    const g = genreOf({ docs, templates, comps: {}, features: [] }, d.genre);
+    const g = (templates[d.genre] || GENRES[d.genre]);
     return { d, g, title: titleOf(d.v), missing: buildTicket(g, d.v, defs).missing };
   }), [docs, templates, defs]);
   const q = query.trim().toLowerCase();
