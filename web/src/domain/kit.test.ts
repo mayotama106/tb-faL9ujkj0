@@ -1,6 +1,6 @@
 /* テンプレート集: 初期の部品・テンプレートの整合と、本文の組み立て */
 import { describe, expect, it } from "vitest";
-import { assemble, defaultKit, holesOf, normalizeKit, partsOf, usedBy, KIT_CATS, KIT_GENRES } from "./kit";
+import { assemble, defaultKit, holesOf, insertIndex, mergeDefaults, normalizeKit, partsOf, usedBy, KIT_CATS, KIT_GENRES } from "./kit";
 
 describe("初期のテンプレート集", () => {
   const kit = defaultKit();
@@ -44,5 +44,31 @@ describe("本文の組み立て", () => {
     expect(normalizeKit({ parts: "x", tpls: [] })).toBeNull();
     expect(normalizeKit({ parts: [{ id: "a", body: 1 }, null], tpls: [{ id: "t", parts: ["a", 3] }] }))
       .toEqual({ parts: [{ id: "a", cat: "基本", name: "", body: "" }], tpls: [{ id: "t", genre: "その他", name: "", desc: "", title: "", parts: ["a"], opt: [] }] });
+  });
+});
+
+describe("初期のテンプレート集が増えたとき", () => {
+  it("まだ知らない部品・テンプレートだけを足し、消したものは戻さない。手を入れていない部品は分類をそろえる", () => {
+    const d = defaultKit();
+    const old = { parts: d.parts.filter(p => !p.id.startsWith("file_")).map(p => (p.id === "ac_get" ? { ...p, cat: "受け入れ条件" } : p.id === "ac_update" ? { ...p, cat: "受け入れ条件", body: "直した" } : p)),
+      tpls: d.tpls.filter(t => t.id !== "t_file_check" && t.id !== "t_bug") };
+    const k = mergeDefaults(structuredClone(old));
+    expect(k.parts.some(p => p.id === "file_ext")).toBe(true);
+    expect(k.tpls.findIndex(t => t.id === "t_file_check")).toBe(d.tpls.findIndex(t => t.id === "t_file_check"));
+    expect(k.parts.find(p => p.id === "ac_get")!.cat).toBe("データ操作");
+    expect(k.parts.find(p => p.id === "ac_update")!.cat).toBe("受け入れ条件");
+    /* seen があれば、消したもの(t_auth)は戻さない */
+    const again = mergeDefaults({ ...structuredClone(k), tpls: k.tpls.filter(t => t.id !== "t_auth") });
+    expect(again.tpls.some(t => t.id === "t_auth")).toBe(false);
+  });
+});
+
+describe("部品を足す位置", () => {
+  it("処理の部品は受け入れ条件の中(エラーの見出しの前)、そのエラーはエラーの中に入る", () => {
+    const kit = defaultKit();
+    const t = kit.tpls.find(x => x.id === "t_free")!;
+    const add = (id: string) => t.parts.splice(insertIndex(kit, t, id), 0, id);
+    add("auth_token"); add("ac_get"); add("file_download"); add("err_download_none"); add("err_auth_expired");
+    expect(t.parts).toEqual(["feat", "story_sys", "flow", "ac_head", "auth_token", "file_download", "ac_get", "err_head", "err_download_none", "err_auth_expired", "test_unit", "deps", "refs"]);
   });
 });

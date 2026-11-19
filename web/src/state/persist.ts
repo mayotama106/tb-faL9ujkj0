@@ -2,7 +2,7 @@
 import { COMPONENTS, type CompDef } from "../domain/components";
 import { migrateFeature, relinkDocs, type Feature } from "../domain/feature";
 import { GENRES, type Genre } from "../domain/genres";
-import { defaultKit, normalizeKit } from "../domain/kit";
+import { defaultKit, mergeDefaults, normalizeKit } from "../domain/kit";
 import { OLD_IMPL_GENRES, toImpl, upgradeImpl } from "./migrateImpl";
 import type { Values } from "../domain/ticket";
 import type { Data, Doc, State, View } from "./store";
@@ -100,7 +100,8 @@ export function loadInitial(): { data: Data; currentId: string | null; collapsed
   const features = Array.isArray(stored.features) ? stored.features.map(migrateFeature) : [];
   relinkDocs(features, docs);
   const featureId = features.some(f => f.id === stored.featureId) ? stored.featureId || null : (features[0] ? features[0].id : null);
-  const kit = normalizeKit(read(KIT_KEY)) || defaultKit();
+  const saved = normalizeKit(read(KIT_KEY));
+  const kit = saved ? mergeDefaults(saved) : defaultKit();
   /* 開いたときは、いつもホーム(テンプレート)から */
   return { data: { docs, templates, comps, features, kit }, currentId, collapsed: stored.collapsed || [], featureId, view: "kit" };
 }

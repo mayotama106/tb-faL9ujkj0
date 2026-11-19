@@ -1,7 +1,7 @@
 /* テンプレート(ホーム)。部品を組み合わせたテンプレートを選び、要らない部品を外してコピーする。
    チケットの中身はここには入れない(コピー先で【】を埋める)。部品もテンプレートも、ここで編集・追加・複製できる */
 import { useMemo, useState } from "react";
-import { KIT_CATS, KIT_GENRES, assemble, defaultKit, holesOf, partsOf, usedBy, type KPart, type KTpl } from "../domain/kit";
+import { KIT_CATS, KIT_GENRES, assemble, defaultKit, holesOf, insertIndex, partsOf, usedBy, type KPart, type KTpl } from "../domain/kit";
 import { getState, newId, setUI, toast, update, useStore } from "../state/store";
 import { AutoText } from "./Fields";
 import { SortableList, move } from "./Sortable";
@@ -208,7 +208,7 @@ export function KitComposer({ t }: { t: KTpl }) {
         <button type="button" className="plain small-btn" onClick={() => { const id = newPart("基本", t); setOpen(id + "#" + t.parts.length); }}>＋ 新しい部品を作って足す</button>
         <button type="button" className="plain small-btn" onClick={() => dupTpl(t)}>複製して別のテンプレートにする</button>
       </div>
-      {adding && <PartPicker t={t} onPick={id => editTpl(t.id, x => { x.parts.push(id); })} />}
+      {adding && <PartPicker t={t} onPick={id => editTpl(t.id, x => { x.parts.splice(insertIndex(kit, x, id), 0, id); })} />}
     </section>
   </>;
 }
